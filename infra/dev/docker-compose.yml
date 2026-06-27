@@ -1,4 +1,23 @@
 services:
+  ridely-svc-postgres:
+    image: postgres:18.4-alpine
+    container_name: ridely-svc-postgres
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/18/docker
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "${POSTGRES_USER}", "-d", "${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
   ridely-svc-mongodb:
     image: mongo:8.3.4
     container_name: ridely-svc-mongodb
@@ -55,6 +74,7 @@ services:
     restart: unless-stopped
 
 volumes:
+  postgres_data:
   mongodb_data:
   redis_data:
   rabbitmq_data:
