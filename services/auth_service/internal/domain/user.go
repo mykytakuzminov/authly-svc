@@ -18,6 +18,11 @@ type User struct {
 	UpdatedAt    time.Time
 }
 
+type RegisterInput struct {
+	Email    string
+	Password string
+}
+
 type DB interface {
 	Exec(ctx context.Context, sql string, args ...interface{}) (pgconn.CommandTag, error)
 	Query(ctx context.Context, sql string, args ...interface{}) pgx.Rows
@@ -26,4 +31,9 @@ type DB interface {
 
 type UserRepository interface {
 	Create(ctx context.Context, user *User) error
+	ExistsByEmail(ctx context.Context, email string) (bool, error)
+}
+
+type UserService interface {
+	Register(ctx context.Context, input *RegisterInput) (*TokenPair, error)
 }
