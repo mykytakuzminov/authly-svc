@@ -9,7 +9,7 @@ import (
 
 type RefreshToken struct {
 	Token  string
-	UserID string
+	UserID uuid.UUID
 	TTL    time.Duration
 }
 
@@ -27,6 +27,7 @@ type TokenManager interface {
 	GenerateAccessToken(userID uuid.UUID, role string) (string, error)
 	GenerateRefreshToken(userID uuid.UUID, role string) (string, error)
 	Parse(token string) (*Claims, error)
+	GetRefreshTTL() time.Duration
 }
 
 type TokenRepository interface {

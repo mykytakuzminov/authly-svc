@@ -100,6 +100,10 @@ func (m *JWTManager) Parse(token string) (*domain.Claims, error) {
 	}, nil
 }
 
+func (m *JWTManager) GetRefreshTTL() time.Duration {
+	return m.cfg.RefreshTTL
+}
+
 func (m *JWTManager) generateJWT(userID uuid.UUID, role string, ttl time.Duration) (string, error) {
 	claims := jwt.MapClaims{
 		"sub":  userID,

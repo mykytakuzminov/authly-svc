@@ -23,7 +23,7 @@ func NewTokenRepository(db *redis.Client, logger *zap.SugaredLogger) domain.Toke
 }
 
 func (r *tokenRepository) Set(ctx context.Context, token *domain.RefreshToken) error {
-	if err := r.db.Set(ctx, token.Token, token.UserID, token.TTL).Err(); err != nil {
+	if err := r.db.Set(ctx, token.Token, token.UserID.String(), token.TTL).Err(); err != nil {
 		r.logger.Errorw("failed to set refresh token", "error", err)
 		return err
 	}
