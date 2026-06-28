@@ -31,6 +31,7 @@ func NewAuthService(
 }
 
 func (s *authService) Register(ctx context.Context, input *domain.RegisterInput) (*domain.TokenPair, error) {
+	// Check existence
 	exists, err := s.userRepo.ExistsByEmail(ctx, input.Email)
 	if err != nil {
 		return nil, err
@@ -40,19 +41,42 @@ func (s *authService) Register(ctx context.Context, input *domain.RegisterInput)
 		return nil, domain.ErrUserAlreadyExists
 	}
 
+	// Hash password
 	hpwd, err := bcrypt.GenerateFromPassword([]byte(input.Password), 12)
 	if err != nil {
 		s.logger.Errorw("registration rejected, failed to hash password", "error", err)
 		return nil, err
 	}
 
+	// Create user
 	user := &domain.User{Email: input.Email, PasswordHash: string(hpwd)}
 	if err := s.userRepo.Create(ctx, user); err != nil {
 		return nil, err
 	}
 
 	// Generate tokens
+	accessToken, err := s.jwtManager.GenerateAccessToken(user.ID, user.Role)
+	if err != nil {
+		return nil, err
+	}
+	refreshToken, err := s.jwtManager.GenerateRefreshToken(user.ID, user.Role)
+	if err != nil {
+		return nil, err
+	}
 
+	// Save refresh token
+	if err := s.tokenRepo.Set(ctx, &domain.RefreshToken{
+		Token:  refreshToken,
+		UserID: user.ID,
+		TTL:    s.jwtManager.GetRefreshTTL(),
+	}); err != nil {
+		return nil, err
+	}
+
+	// Return tokens
 	s.logger.Infow("user registered successfully", "user_id", user.ID)
-	return nil, nil
+	return &domain.TokenPair{
+		AccessToken:  accessToken,
+		RefreshToken: refreshToken,
+	}, nil
 }
