@@ -9,20 +9,26 @@ import (
 	"github.com/mykytakuzminov/ridely-svc/services/auth_service/internal/domain"
 )
 
-type userService struct {
-	repo   domain.UserRepository
-	logger *zap.SugaredLogger
+type authService struct {
+	userRepo  domain.UserRepository
+	tokenRepo domain.TokenRepository
+	logger    *zap.SugaredLogger
 }
 
-func NewUserService(repo domain.UserRepository, logger *zap.SugaredLogger) domain.UserService {
-	return &userService{
-		repo:   repo,
-		logger: logger.With("layer", "service"),
+func NewAuthService(
+	userRepo domain.UserRepository,
+	tokenRepo domain.TokenRepository,
+	logger *zap.SugaredLogger,
+) domain.AuthService {
+	return &authService{
+		userRepo:  userRepo,
+		tokenRepo: tokenRepo,
+		logger:    logger.With("layer", "service"),
 	}
 }
 
-func (s *userService) Register(ctx context.Context, input *domain.RegisterInput) (*domain.TokenPair, error) {
-	exists, err := s.repo.ExistsByEmail(ctx, input.Email)
+func (s *authService) Register(ctx context.Context, input *domain.RegisterInput) (*domain.TokenPair, error) {
+	exists, err := s.userRepo.ExistsByEmail(ctx, input.Email)
 	if err != nil {
 		return nil, err
 	}
@@ -38,7 +44,7 @@ func (s *userService) Register(ctx context.Context, input *domain.RegisterInput)
 	}
 
 	user := &domain.User{Email: input.Email, PasswordHash: string(hpwd)}
-	if err := s.repo.Create(ctx, user); err != nil {
+	if err := s.userRepo.Create(ctx, user); err != nil {
 		return nil, err
 	}
 
