@@ -10,20 +10,23 @@ import (
 )
 
 type authService struct {
-	userRepo  domain.UserRepository
-	tokenRepo domain.TokenRepository
-	logger    *zap.SugaredLogger
+	userRepo   domain.UserRepository
+	tokenRepo  domain.TokenRepository
+	jwtManager domain.TokenManager
+	logger     *zap.SugaredLogger
 }
 
 func NewAuthService(
 	userRepo domain.UserRepository,
 	tokenRepo domain.TokenRepository,
+	jwtManager domain.TokenManager,
 	logger *zap.SugaredLogger,
 ) domain.AuthService {
 	return &authService{
-		userRepo:  userRepo,
-		tokenRepo: tokenRepo,
-		logger:    logger.With("layer", "service"),
+		userRepo:   userRepo,
+		tokenRepo:  tokenRepo,
+		jwtManager: jwtManager,
+		logger:     logger.With("layer", "service"),
 	}
 }
 
