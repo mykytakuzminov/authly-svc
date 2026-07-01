@@ -12,21 +12,20 @@ import (
 
 type authGrpcHandler struct {
 	authpb.UnimplementedAuthServiceServer
-
 	authSvc   domain.AuthService
-	logger    *zap.SugaredLogger
 	validator *validator.Validate
+	logger    *zap.SugaredLogger
 }
 
 func NewAuthHandler(
 	authSvc domain.AuthService,
-	logger *zap.SugaredLogger,
 	validator *validator.Validate,
+	logger *zap.SugaredLogger,
 ) *authGrpcHandler {
 	return &authGrpcHandler{
 		authSvc:   authSvc,
-		logger:    logger.With("layer", "handler"),
 		validator: validator,
+		logger:    logger.With("layer", "handler"),
 	}
 }
 
