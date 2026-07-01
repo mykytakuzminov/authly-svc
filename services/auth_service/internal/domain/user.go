@@ -17,8 +17,8 @@ type User struct {
 }
 
 type RegisterInput struct {
-	Email    string
-	Password string
+	Email    string `json:"email"    validate:"required,email,max=255"`
+	Password string `json:"password" validate:"required,min=12,max=72"`
 }
 
 type UserRepository interface {

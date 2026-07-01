@@ -1,7 +1,15 @@
 include .env
 export
 
-COMPOSE_DEV=infra/dev/docker-compose.yml
+COMPOSE_DEV := infra/dev/docker-compose.yml
+
+PROTO_DIR := proto
+PROTO_SRC := $(wildcard $(PROTO_DIR)/*.proto)
+GO_OUT := .
+
+.PHONY: dev-env-up dev-env-down dev-env-rebuild dev-env-clear dev-env-logs
+.PHONY: check
+.PHONY: generate-proto
 
 # ── Docker ────────────────────────────────────────────────
 dev-env-up:
@@ -26,3 +34,11 @@ check:
 	go vet ./...
 	golangci-lint run
 	go build -o /dev/null ./...
+
+# ── Proto ─────────────────────────────────────────────────
+generate-proto:
+	protoc \
+		--proto_path=$(PROTO_DIR) \
+		--go_out=$(GO_OUT) \
+		--go-grpc_out=$(GO_OUT) \
+		$(PROTO_SRC)
