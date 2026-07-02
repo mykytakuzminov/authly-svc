@@ -46,9 +46,6 @@ func (r *userRepository) ExistsByEmail(ctx context.Context, email string) (bool,
 	var exists bool
 	err := r.db.QueryRow(ctx, query, email).Scan(&exists)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return false, domain.ErrUserNotFound
-		}
 		r.logger.Errorw("failed to scan existence", "error", err)
 		return false, err
 	}
