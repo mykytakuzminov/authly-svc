@@ -21,7 +21,7 @@ func NewAuthHandler(
 	authSvc domain.AuthService,
 	validator *validator.Validate,
 	logger *zap.SugaredLogger,
-) *authGrpcHandler {
+) authpb.AuthServiceServer {
 	return &authGrpcHandler{
 		authSvc:   authSvc,
 		validator: validator,
