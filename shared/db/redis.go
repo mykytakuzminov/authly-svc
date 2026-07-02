@@ -1,8 +1,9 @@
-package redis
+package db
 
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/redis/go-redis/v9"
 
@@ -10,15 +11,15 @@ import (
 	"github.com/mykytakuzminov/ridely-svc/shared/errors"
 )
 
-type RedisConfig struct {
+type redisConfig struct {
 	Host     string
 	Port     string
 	Password string
 	DB       int
 }
 
-func NewRedisConfig() (*RedisConfig, error) {
-	cfg := &RedisConfig{}
+func newRedisConfig() (*redisConfig, error) {
+	cfg := &redisConfig{}
 	cfg.load()
 	if err := cfg.validate(); err != nil {
 		return nil, err
@@ -26,25 +27,25 @@ func NewRedisConfig() (*RedisConfig, error) {
 	return cfg, nil
 }
 
-func (c *RedisConfig) load() {
+func (c *redisConfig) load() {
 	c.Host = env.GetString("REDIS_HOST", "localhost")
 	c.Port = env.GetString("REDIS_PORT", "6379")
 	c.Password = env.GetString("REDIS_PASSWORD", "")
 	c.DB = env.GetInt("REDIS_DB", 0)
 }
 
-func (c *RedisConfig) validate() error {
+func (c *redisConfig) validate() error {
 	if c.Password == "" {
 		return fmt.Errorf("REDIS_PASSWORD %w", errors.ErrIsRequired)
 	}
 	return nil
 }
 
-func (c *RedisConfig) getAddr() string {
+func (c *redisConfig) getAddr() string {
 	return c.Host + ":" + c.Port
 }
 
-func NewRedisClient(ctx context.Context, cfg *RedisConfig) (*redis.Client, error) {
+func newRedisClient(ctx context.Context, cfg *redisConfig) (*redis.Client, error) {
 	client := redis.NewClient(&redis.Options{
 		Addr:     cfg.getAddr(),
 		Password: cfg.Password,
@@ -52,6 +53,23 @@ func NewRedisClient(ctx context.Context, cfg *RedisConfig) (*redis.Client, error
 	})
 	if err := client.Ping(ctx).Err(); err != nil {
 		return nil, err
+	}
+
+	return client, nil
+}
+
+func ConnectRedis(ctx context.Context, timeout time.Duration) (*redis.Client, error) {
+	cfg, err := newRedisConfig()
+	if err != nil {
+		return nil, fmt.Errorf("load config: %w", err)
+	}
+
+	connCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	client, err := newRedisClient(connCtx, cfg)
+	if err != nil {
+		return nil, fmt.Errorf("connect: %w", err)
 	}
 
 	return client, nil
