@@ -1,8 +1,9 @@
-package postgres
+package db
 
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -10,7 +11,7 @@ import (
 	"github.com/mykytakuzminov/ridely-svc/shared/errors"
 )
 
-type PostgresConfig struct {
+type postgresConfig struct {
 	Host     string
 	Port     string
 	User     string
@@ -19,8 +20,8 @@ type PostgresConfig struct {
 	SSLMode  string
 }
 
-func NewPostgresConfig() (*PostgresConfig, error) {
-	cfg := &PostgresConfig{}
+func newPostgresConfig() (*postgresConfig, error) {
+	cfg := &postgresConfig{}
 	cfg.load()
 	if err := cfg.validate(); err != nil {
 		return nil, err
@@ -28,7 +29,7 @@ func NewPostgresConfig() (*PostgresConfig, error) {
 	return cfg, nil
 }
 
-func (c *PostgresConfig) load() {
+func (c *postgresConfig) load() {
 	c.Host = env.GetString("POSTGRES_HOST", "localhost")
 	c.Port = env.GetString("POSTGRES_PORT", "5432")
 	c.User = env.GetString("POSTGRES_USER", "")
@@ -37,7 +38,7 @@ func (c *PostgresConfig) load() {
 	c.SSLMode = env.GetString("POSTGRES_SSLMODE", "disable")
 }
 
-func (c *PostgresConfig) validate() error {
+func (c *postgresConfig) validate() error {
 	if c.User == "" {
 		return fmt.Errorf("POSTGRES_USER %w", errors.ErrIsRequired)
 	}
@@ -50,7 +51,7 @@ func (c *PostgresConfig) validate() error {
 	return nil
 }
 
-func (c *PostgresConfig) getDSN() string {
+func (c *postgresConfig) getDSN() string {
 	return fmt.Sprintf(
 		"postgres://%s:%s@%s:%s/%s?sslmode=%s",
 		c.User,
@@ -62,10 +63,8 @@ func (c *PostgresConfig) getDSN() string {
 	)
 }
 
-func NewPostgresClient(ctx context.Context, cfg *PostgresConfig) (*pgxpool.Pool, error) {
-	url := cfg.getDSN()
-
-	client, err := pgxpool.New(ctx, url)
+func newPostgresClient(ctx context.Context, cfg *postgresConfig) (*pgxpool.Pool, error) {
+	client, err := pgxpool.New(ctx, cfg.getDSN())
 	if err != nil {
 		return nil, err
 	}
@@ -73,5 +72,21 @@ func NewPostgresClient(ctx context.Context, cfg *PostgresConfig) (*pgxpool.Pool,
 		return nil, err
 	}
 
+	return client, nil
+}
+
+func ConnectPostgres(ctx context.Context, timeout time.Duration) (*pgxpool.Pool, error) {
+	cfg, err := newPostgresConfig()
+	if err != nil {
+		return nil, fmt.Errorf("load config: %w", err)
+	}
+
+	connCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	client, err := newPostgresClient(connCtx, cfg)
+	if err != nil {
+		return nil, fmt.Errorf("connect: %w", err)
+	}
 	return client, nil
 }

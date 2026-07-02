@@ -12,14 +12,14 @@ import (
 	"github.com/mykytakuzminov/ridely-svc/shared/errors"
 )
 
-type JWTConfig struct {
+type jwtConfig struct {
 	Secret     string
 	AccessTTL  time.Duration
 	RefreshTTL time.Duration
 }
 
-func NewJWTConfig() (*JWTConfig, error) {
-	cfg := &JWTConfig{}
+func newJWTConfig() (*jwtConfig, error) {
+	cfg := &jwtConfig{}
 	cfg.load()
 	if err := cfg.validate(); err != nil {
 		return nil, err
@@ -27,28 +27,32 @@ func NewJWTConfig() (*JWTConfig, error) {
 	return cfg, nil
 }
 
-func (c *JWTConfig) load() {
+func (c *jwtConfig) load() {
 	c.Secret = env.GetString("JWT_SECRET", "")
 	c.AccessTTL = env.GetDuration("JWT_ACCESS_TTL", 15*time.Minute)
 	c.RefreshTTL = env.GetDuration("JWT_REFRESH_TTL", 168*time.Hour)
 }
 
-func (c *JWTConfig) validate() error {
+func (c *jwtConfig) validate() error {
 	if c.Secret == "" {
 		return fmt.Errorf("JWT_SECRET %w", errors.ErrIsRequired)
 	}
 	return nil
 }
 
-type JWTManager struct {
-	cfg *JWTConfig
+type jwtManager struct {
+	cfg *jwtConfig
 }
 
-func NewJWTManager(cfg *JWTConfig) domain.TokenManager {
-	return &JWTManager{cfg: cfg}
+func NewManager() (domain.TokenManager, error) {
+	cfg, err := newJWTConfig()
+	if err != nil {
+		return nil, fmt.Errorf("load config: %w", err)
+	}
+	return &jwtManager{cfg: cfg}, nil
 }
 
-func (m *JWTManager) GenerateAccessToken(userID uuid.UUID, role string) (string, error) {
+func (m *jwtManager) GenerateAccessToken(userID uuid.UUID, role string) (string, error) {
 	token, err := m.generateJWT(userID, role, m.cfg.AccessTTL)
 	if err != nil {
 		return "", err
@@ -56,7 +60,7 @@ func (m *JWTManager) GenerateAccessToken(userID uuid.UUID, role string) (string,
 	return token, nil
 }
 
-func (m *JWTManager) GenerateRefreshToken(userID uuid.UUID, role string) (string, error) {
+func (m *jwtManager) GenerateRefreshToken(userID uuid.UUID, role string) (string, error) {
 	token, err := m.generateJWT(userID, role, m.cfg.RefreshTTL)
 	if err != nil {
 		return "", err
@@ -64,7 +68,7 @@ func (m *JWTManager) GenerateRefreshToken(userID uuid.UUID, role string) (string
 	return token, nil
 }
 
-func (m *JWTManager) Parse(token string) (*domain.Claims, error) {
+func (m *jwtManager) Parse(token string) (*domain.Claims, error) {
 	parsedToken, err := jwt.Parse(token, func(t *jwt.Token) (interface{}, error) {
 		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, domain.ErrInvalidSigningMethod
@@ -100,11 +104,11 @@ func (m *JWTManager) Parse(token string) (*domain.Claims, error) {
 	}, nil
 }
 
-func (m *JWTManager) GetRefreshTTL() time.Duration {
+func (m *jwtManager) GetRefreshTTL() time.Duration {
 	return m.cfg.RefreshTTL
 }
 
-func (m *JWTManager) generateJWT(userID uuid.UUID, role string, ttl time.Duration) (string, error) {
+func (m *jwtManager) generateJWT(userID uuid.UUID, role string, ttl time.Duration) (string, error) {
 	claims := jwt.MapClaims{
 		"sub":  userID,
 		"role": role,
@@ -120,7 +124,7 @@ func (m *JWTManager) generateJWT(userID uuid.UUID, role string, ttl time.Duratio
 	return signedToken, nil
 }
 
-func (m *JWTManager) getStringClaim(claims jwt.MapClaims, key string) (string, error) {
+func (m *jwtManager) getStringClaim(claims jwt.MapClaims, key string) (string, error) {
 	val, ok := claims[key].(string)
 	if !ok {
 		return "", domain.ErrInvalidClaim

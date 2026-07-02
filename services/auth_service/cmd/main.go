@@ -2,11 +2,16 @@ package main
 
 import (
 	"context"
-	"net"
+	"fmt"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/go-playground/validator/v10"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
+	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
 	grpclib "google.golang.org/grpc"
 
@@ -14,60 +19,114 @@ import (
 	"github.com/mykytakuzminov/ridely-svc/services/auth_service/internal/infra/jwt"
 	"github.com/mykytakuzminov/ridely-svc/services/auth_service/internal/infra/repository"
 	"github.com/mykytakuzminov/ridely-svc/services/auth_service/internal/service"
-	"github.com/mykytakuzminov/ridely-svc/shared/postgres"
+	"github.com/mykytakuzminov/ridely-svc/shared/db"
 	authpb "github.com/mykytakuzminov/ridely-svc/shared/proto/auth"
-	"github.com/mykytakuzminov/ridely-svc/shared/redis"
+	"github.com/mykytakuzminov/ridely-svc/shared/server"
 )
 
 func main() {
-	l := zap.Must(zap.NewProduction())
-	logger := l.Sugar()
-	validator := validator.New()
+	logger := zap.Must(zap.NewProduction()).Sugar()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	app, err := newApp(ctx, logger)
+	if err != nil {
+		logger.Fatalw("failed to initialize app", "error", err)
+	}
+
+	os.Exit(app.Run())
+}
+
+type app struct {
+	pgClient   *pgxpool.Pool
+	rdClient   *redis.Client
+	grpcServer *server.GRPCServer
+	logger     *zap.SugaredLogger
+}
+
+func newApp(ctx context.Context, logger *zap.SugaredLogger) (*app, error) {
+	a := &app{logger: logger}
 
 	if err := godotenv.Load(); err != nil {
 		logger.Warnw("no .env file, reading from environment")
 	}
 
-	pgCfg, err := postgres.NewPostgresConfig()
+	pgClient, err := db.ConnectPostgres(ctx, 5*time.Second)
 	if err != nil {
-		logger.Fatalw("failed to load postgres config", "error", err)
+		return nil, fmt.Errorf("postgres init: %w", err)
 	}
-	rdCfg, err := redis.NewRedisConfig()
-	if err != nil {
-		logger.Fatalw("failed to load redis config", "error", err)
-	}
-	jwtCfg, err := jwt.NewJWTConfig()
-	if err != nil {
-		logger.Fatalw("failed to load jwt config", "error", err)
-	}
+	a.pgClient = pgClient
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	pgClient, err := postgres.NewPostgresClient(ctx, pgCfg)
+	rdClient, err := db.ConnectRedis(ctx, 5*time.Second)
 	if err != nil {
-		logger.Fatalw("failed to establish postgres connection", "error", err)
+		a.close()
+		return nil, fmt.Errorf("redis init: %w", err)
 	}
-	rdClient, err := redis.NewRedisClient(ctx, rdCfg)
+	a.rdClient = rdClient
+
+	jwtManager, err := jwt.NewManager()
 	if err != nil {
-		logger.Fatalw("failed to establish redis connection", "error", err)
+		a.close()
+		return nil, fmt.Errorf("jwt manager init: %w", err)
 	}
 
 	userRepo := repository.NewUserRepository(pgClient, logger)
 	tokenRepo := repository.NewTokenRepository(rdClient, logger)
-	jwtManager := jwt.NewJWTManager(jwtCfg)
 	authSvc := service.NewAuthService(userRepo, tokenRepo, jwtManager, logger)
-	authHandler := grpc.NewAuthHandler(authSvc, validator, logger)
+	authHandler := grpc.NewAuthHandler(authSvc, validator.New(), logger)
 
-	listener, err := net.Listen("tcp", ":50051")
+	grpcServer, err := server.NewGRPCServer(logger, func(s *grpclib.Server) {
+		authpb.RegisterAuthServiceServer(s, authHandler)
+	})
 	if err != nil {
-		logger.Fatalw("failed to listen", "error", err)
+		a.close()
+		return nil, fmt.Errorf("grpc server init: %w", err)
+	}
+	a.grpcServer = grpcServer
+
+	return a, nil
+}
+
+func (a *app) Run() int {
+	defer func() {
+		if err := a.logger.Sync(); err != nil {
+			a.logger.Errorw("failed to sync logger", "error", err)
+		}
+	}()
+	defer a.close()
+
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- a.grpcServer.Run()
+	}()
+
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+
+	exitCode := 0
+	select {
+	case err := <-errCh:
+		a.logger.Errorw("unexpected error occurred", "error", err)
+		exitCode = 1
+	case sig := <-quit:
+		a.logger.Infow("shutdown signal received", "signal", sig.String())
 	}
 
-	grpcServer := grpclib.NewServer()
-	authpb.RegisterAuthServiceServer(grpcServer, authHandler)
-	logger.Infow("starting grpc server", "address", listener.Addr().String())
-	if err := grpcServer.Serve(listener); err != nil {
-		logger.Fatalw("grpc server failed", "error", err)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	a.grpcServer.GracefulStop(ctx)
+
+	return exitCode
+}
+
+func (a *app) close() {
+	if a.pgClient != nil {
+		a.pgClient.Close()
+	}
+	if a.rdClient != nil {
+		if err := a.rdClient.Close(); err != nil {
+			a.logger.Errorw("failed to close redis connection", "error", err)
+		}
 	}
 }
