@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+
 	"os"
 	"os/signal"
 	"syscall"
@@ -11,6 +12,8 @@ import (
 	"github.com/go-chi/chi/v5"
 	"go.uber.org/zap"
 
+	"github.com/mykytakuzminov/ridely-svc/services/api_gateway/internal/http"
+	"github.com/mykytakuzminov/ridely-svc/services/api_gateway/internal/infra/grpc"
 	"github.com/mykytakuzminov/ridely-svc/shared/server"
 )
 
@@ -27,15 +30,24 @@ func main() {
 
 type app struct {
 	httpServer *server.HTTPServer
+	authClient *grpc.AuthServiceClient
 	logger     *zap.SugaredLogger
 }
 
 func newApp(logger *zap.SugaredLogger) (*app, error) {
 	a := &app{logger: logger}
 
-	router := chi.NewRouter()
+	authClient, err := grpc.NewAuthServiceClient()
+	if err != nil {
+		return nil, fmt.Errorf("auth client init: %w", err)
+	}
+	a.authClient = authClient
+
+	router := a.initRouter()
+
 	httpServer, err := server.NewHTTPServer(router, logger)
 	if err != nil {
+		a.Close()
 		return nil, fmt.Errorf("http server init: %w", err)
 	}
 	a.httpServer = httpServer
@@ -49,6 +61,7 @@ func (a *app) Run() int {
 			a.logger.Errorw("failed to sync logger", "error", err)
 		}
 	}()
+	defer a.Close()
 
 	errCh := make(chan error, 1)
 	go func() {
@@ -75,4 +88,24 @@ func (a *app) Run() int {
 	}
 
 	return exitCode
+}
+
+func (a *app) Close() {
+	if a.authClient != nil {
+		if err := a.authClient.Close(); err != nil {
+			a.logger.Errorw("failed to close auth client connection", "error", err)
+		}
+	}
+}
+
+func (a *app) initRouter() chi.Router {
+	authHandler := http.NewAuthHTTPHandler(a.authClient.Client, a.logger)
+
+	router := chi.NewRouter()
+
+	router.Route("/api/v1", func(r chi.Router) {
+		r.Post("/auth/register", authHandler.HandleRegister)
+	})
+
+	return router
 }
