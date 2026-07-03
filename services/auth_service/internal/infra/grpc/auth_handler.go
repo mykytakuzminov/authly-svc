@@ -9,6 +9,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/mykytakuzminov/ridely-svc/services/auth_service/internal/domain"
+	"github.com/mykytakuzminov/ridely-svc/shared/errors"
 	authpb "github.com/mykytakuzminov/ridely-svc/shared/proto/auth"
 )
 
@@ -43,7 +44,7 @@ func (h *authGrpcHandler) Register(ctx context.Context, req *authpb.RegisterRequ
 
 	tokens, err := h.authSvc.Register(ctx, input)
 	if err != nil {
-		return nil, toGRPCError(err)
+		return nil, errors.ToGRPCError(err)
 	}
 
 	return &authpb.RegisterResponse{
