@@ -17,9 +17,11 @@ import (
 
 	"github.com/mykytakuzminov/ridely-svc/services/auth_service/internal/infra/grpc"
 	"github.com/mykytakuzminov/ridely-svc/services/auth_service/internal/infra/jwt"
+	"github.com/mykytakuzminov/ridely-svc/services/auth_service/internal/infra/migrations"
 	"github.com/mykytakuzminov/ridely-svc/services/auth_service/internal/infra/repository"
 	"github.com/mykytakuzminov/ridely-svc/services/auth_service/internal/service"
 	"github.com/mykytakuzminov/ridely-svc/shared/db"
+	"github.com/mykytakuzminov/ridely-svc/shared/migrate"
 	authpb "github.com/mykytakuzminov/ridely-svc/shared/proto/auth"
 	"github.com/mykytakuzminov/ridely-svc/shared/server"
 )
@@ -57,6 +59,11 @@ func newApp(ctx context.Context, logger *zap.SugaredLogger) (*app, error) {
 		return nil, fmt.Errorf("postgres init: %w", err)
 	}
 	a.pgClient = pgClient
+
+	if err := migrate.Run(pgClient, migrations.FS, logger); err != nil {
+		a.close()
+		return nil, fmt.Errorf("migrate: %w", err)
+	}
 
 	rdClient, err := db.ConnectRedis(ctx, 5*time.Second)
 	if err != nil {
