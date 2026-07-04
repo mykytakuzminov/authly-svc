@@ -23,6 +23,12 @@ func NewAuthHTTPHandler(authClient authpb.AuthServiceClient, logger *zap.Sugared
 	}
 }
 
+// Register godoc
+// @Summary     Register a new user
+// @Tags        auth
+// @Accept      json
+// @Produce     json
+// @Router      /auth/register [post]
 func (h *authHTTPHandler) HandleRegister(w http.ResponseWriter, r *http.Request) {
 	var reqBody domain.RegisterInput
 	if err := ReadJSON(w, r, &reqBody); err != nil {
