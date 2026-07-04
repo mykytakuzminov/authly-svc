@@ -78,6 +78,8 @@ func (s *GRPCServer) Run() error {
 }
 
 func (s *GRPCServer) GracefulStop(ctx context.Context) {
+	s.logger.Infow("shutting down grpc server")
+
 	done := make(chan struct{})
 	go func() {
 		s.server.GracefulStop()
