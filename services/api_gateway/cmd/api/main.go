@@ -12,11 +12,23 @@ import (
 	"github.com/go-chi/chi/v5"
 	"go.uber.org/zap"
 
+	httpSwagger "github.com/swaggo/http-swagger"
+
+	_ "github.com/mykytakuzminov/ridely-svc/docs"
 	"github.com/mykytakuzminov/ridely-svc/services/api_gateway/internal/http"
 	"github.com/mykytakuzminov/ridely-svc/services/api_gateway/internal/infra/grpc"
 	"github.com/mykytakuzminov/ridely-svc/shared/server"
 )
 
+// @title           Ridely
+// @version         1.0
+//
+// @BasePath        /api/v1
+//
+// @securityDefinitions.apikey BearerAuth
+// @in                         header
+// @name                       Authorization
+// @description                Enter your Bearer token in the format: Bearer <token>
 func main() {
 	logger := zap.Must(zap.NewProduction()).Sugar()
 
@@ -102,6 +114,10 @@ func (a *app) initRouter() chi.Router {
 	authHandler := http.NewAuthHTTPHandler(a.authClient.Client, a.logger)
 
 	router := chi.NewRouter()
+
+	router.Get("/swagger/*", httpSwagger.Handler(
+		httpSwagger.URL("http://localhost:8080/swagger/doc.json"),
+	))
 
 	router.Route("/api/v1", func(r chi.Router) {
 		r.Post("/auth/register", authHandler.HandleRegister)
