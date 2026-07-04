@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/go-playground/validator/v10"
 	"go.uber.org/zap"
 
 	httpSwagger "github.com/swaggo/http-swagger"
@@ -111,7 +112,7 @@ func (a *app) Close() {
 }
 
 func (a *app) initRouter() chi.Router {
-	authHandler := http.NewAuthHTTPHandler(a.authClient.Client, a.logger)
+	authHandler := http.NewAuthHTTPHandler(a.authClient.Client, validator.New(), a.logger)
 
 	router := chi.NewRouter()
 

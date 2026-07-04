@@ -5,6 +5,8 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/go-playground/validator/v10"
+
 	"github.com/mykytakuzminov/ridely-svc/services/api_gateway/internal/domain"
 	"github.com/mykytakuzminov/ridely-svc/shared/contracts"
 	"github.com/mykytakuzminov/ridely-svc/shared/errors"
@@ -13,12 +15,18 @@ import (
 
 type authHTTPHandler struct {
 	authClient authpb.AuthServiceClient
+	validator  *validator.Validate
 	logger     *zap.SugaredLogger
 }
 
-func NewAuthHTTPHandler(authClient authpb.AuthServiceClient, logger *zap.SugaredLogger) *authHTTPHandler {
+func NewAuthHTTPHandler(
+	authClient authpb.AuthServiceClient,
+	validator *validator.Validate,
+	logger *zap.SugaredLogger,
+) *authHTTPHandler {
 	return &authHTTPHandler{
 		authClient: authClient,
+		validator:  validator,
 		logger:     logger,
 	}
 }
@@ -32,8 +40,14 @@ func NewAuthHTTPHandler(authClient authpb.AuthServiceClient, logger *zap.Sugared
 func (h *authHTTPHandler) HandleRegister(w http.ResponseWriter, r *http.Request) {
 	var reqBody domain.RegisterInput
 	if err := ReadJSON(w, r, &reqBody); err != nil {
-		h.logger.Errorw("failed to parse json data", "error", err)
+		h.logger.Errorw("failed to parse JSON data", "error", err)
 		http.Error(w, "failed to parse JSON data", http.StatusBadRequest)
+		return
+	}
+
+	if err := h.validator.Struct(&reqBody); err != nil {
+		h.logger.Warnw("registration data validation failed", "error", err)
+		http.Error(w, "registration data validation failed", http.StatusBadRequest)
 		return
 	}
 
