@@ -89,7 +89,7 @@ func (m *jwtManager) Parse(token string) (*domain.Claims, error) {
 
 	claims, ok := parsedToken.Claims.(jwt.MapClaims)
 	if !ok {
-		m.logger.Errorw("failed to get token claims", "error", err)
+		m.logger.Errorw("failed to get token claims")
 		return nil, domain.ErrInvalidToken
 	}
 
