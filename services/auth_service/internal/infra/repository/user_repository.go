@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"go.uber.org/zap"
 
 	"github.com/mykytakuzminov/ridely-svc/services/auth_service/internal/domain"
@@ -60,8 +61,9 @@ func (r *userRepository) scanUser(row pgx.Row, user *domain.User) error {
 		&user.CreatedAt,
 		&user.UpdatedAt,
 	); err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return domain.ErrUserNotFound
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+			return domain.ErrUserAlreadyExists
 		}
 		r.logger.Errorw("failed to scan user", "error", err)
 		return err
