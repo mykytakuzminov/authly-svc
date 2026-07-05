@@ -54,6 +54,42 @@ func (s *authService) Register(ctx context.Context, input *domain.RegisterInput)
 		return nil, err
 	}
 
+	// Generate and save tokens
+	tokens, err := s.generateAndSaveTokens(ctx, user)
+	if err != nil {
+		return nil, err
+	}
+
+	// Return tokens
+	s.logger.Infow("user registered successfully", "user_id", user.ID)
+	return tokens, nil
+}
+
+func (s *authService) Login(ctx context.Context, input *domain.LoginInput) (*domain.TokenPair, error) {
+	// Check existence
+	user, err := s.userRepo.GetByEmail(ctx, input.Email)
+	if err != nil {
+		s.logger.Warnw("login failed, invalid email", "email", input.Email)
+		return nil, domain.ErrInvalidCredentials
+	}
+
+	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(input.Password)); err != nil {
+		s.logger.Warnw("login failed, invalid password")
+		return nil, domain.ErrInvalidCredentials
+	}
+
+	// Generate and save tokens
+	tokens, err := s.generateAndSaveTokens(ctx, user)
+	if err != nil {
+		return nil, err
+	}
+
+	// Return tokens
+	s.logger.Infow("user logged in successfully", "user_id", user.ID)
+	return tokens, nil
+}
+
+func (s *authService) generateAndSaveTokens(ctx context.Context, user *domain.User) (*domain.TokenPair, error) {
 	// Generate tokens
 	accessToken, err := s.jwtManager.GenerateAccessToken(user.ID, user.Role)
 	if err != nil {
@@ -73,8 +109,7 @@ func (s *authService) Register(ctx context.Context, input *domain.RegisterInput)
 		return nil, err
 	}
 
-	// Return tokens
-	s.logger.Infow("user registered successfully", "user_id", user.ID)
+	// Return token pair
 	return &domain.TokenPair{
 		AccessToken:  accessToken,
 		RefreshToken: refreshToken,

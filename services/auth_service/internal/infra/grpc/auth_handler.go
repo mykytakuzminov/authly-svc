@@ -52,3 +52,24 @@ func (h *authGrpcHandler) Register(ctx context.Context, req *authpb.RegisterRequ
 		RefreshToken: tokens.RefreshToken,
 	}, nil
 }
+
+func (h *authGrpcHandler) Login(ctx context.Context, req *authpb.LoginRequest) (*authpb.LoginResponse, error) {
+	input := &domain.LoginInput{
+		Email:    req.Email,
+		Password: req.Password,
+	}
+	if err := h.validator.Struct(input); err != nil {
+		h.logger.Warnw("login data validation failed", "error", err)
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
+	tokens, err := h.authSvc.Login(ctx, input)
+	if err != nil {
+		return nil, errors.ToGRPCError(err)
+	}
+
+	return &authpb.LoginResponse{
+		AccessToken:  tokens.AccessToken,
+		RefreshToken: tokens.RefreshToken,
+	}, nil
+}
