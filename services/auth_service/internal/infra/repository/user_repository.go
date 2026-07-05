@@ -54,17 +54,39 @@ func (r *userRepository) ExistsByEmail(ctx context.Context, email string) (bool,
 	return exists, nil
 }
 
+func (r *userRepository) GetByEmail(ctx context.Context, email string) (*domain.User, error) {
+	query := `
+		SELECT id, email, password_hash, role, created_at, updated_at
+		FROM users
+		WHERE email = $1
+	`
+	row := r.db.QueryRow(ctx, query, email)
+	user := &domain.User{}
+	if err := r.scanUser(row, user); err != nil {
+		return nil, err
+	}
+
+	return user, nil
+}
+
 func (r *userRepository) scanUser(row pgx.Row, user *domain.User) error {
 	if err := row.Scan(
 		&user.ID,
+		&user.Email,
+		&user.PasswordHash,
 		&user.Role,
 		&user.CreatedAt,
 		&user.UpdatedAt,
 	); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return domain.ErrUserNotFound
+		}
+
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
 			return domain.ErrUserAlreadyExists
 		}
+
 		r.logger.Errorw("failed to scan user", "error", err)
 		return err
 	}
