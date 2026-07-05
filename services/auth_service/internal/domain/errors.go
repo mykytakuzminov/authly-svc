@@ -13,5 +13,5 @@ var (
 	ErrInvalidSigningMethod = fmt.Errorf("%w signing method", errors.ErrInvalid)
 	ErrInvalidToken         = fmt.Errorf("%w token", errors.ErrInvalid)
 	ErrInvalidClaim         = fmt.Errorf("%w claim", errors.ErrInvalid)
-	ErrInvalidCredentials   = fmt.Errorf("%w credentials", errors.ErrInvalid)
+	ErrInvalidCredentials   = fmt.Errorf("invalid credentials: %w", errors.ErrUnauthenticated)
 )

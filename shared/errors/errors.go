@@ -9,10 +9,11 @@ import (
 )
 
 var (
-	ErrNotFound      = errors.New("not found")
-	ErrIsRequired    = errors.New("is required")
-	ErrAlreadyExists = errors.New("already exists")
-	ErrInvalid       = errors.New("invalid")
+	ErrNotFound        = errors.New("not found")
+	ErrIsRequired      = errors.New("is required")
+	ErrAlreadyExists   = errors.New("already exists")
+	ErrInvalid         = errors.New("invalid")
+	ErrUnauthenticated = errors.New("unauthenticated")
 )
 
 func ToGRPCError(err error) error {
@@ -21,6 +22,8 @@ func ToGRPCError(err error) error {
 		return status.Error(codes.NotFound, err.Error())
 	case errors.Is(err, ErrAlreadyExists):
 		return status.Error(codes.AlreadyExists, err.Error())
+	case errors.Is(err, ErrUnauthenticated):
+		return status.Error(codes.Unauthenticated, err.Error())
 	case errors.Is(err, ErrInvalid):
 		return status.Error(codes.InvalidArgument, err.Error())
 	case errors.Is(err, ErrIsRequired):
@@ -41,6 +44,8 @@ func ToHTTPError(err error) (int, string) {
 		return http.StatusNotFound, st.Message()
 	case codes.AlreadyExists:
 		return http.StatusConflict, st.Message()
+	case codes.Unauthenticated:
+		return http.StatusUnauthorized, st.Message()
 	case codes.InvalidArgument:
 		return http.StatusBadRequest, st.Message()
 	default:
