@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/signal"
@@ -97,7 +98,9 @@ func newApp(ctx context.Context, logger *zap.SugaredLogger) (*app, error) {
 
 func (a *app) Run() int {
 	defer func() {
-		if err := a.logger.Sync(); err != nil {
+		if err := a.logger.Sync(); err != nil &&
+			!errors.Is(err, syscall.ENOTTY) &&
+			!errors.Is(err, syscall.EINVAL) {
 			a.logger.Errorw("failed to sync logger", "error", err)
 		}
 	}()
