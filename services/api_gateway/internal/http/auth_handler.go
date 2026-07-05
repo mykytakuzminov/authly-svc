@@ -37,7 +37,7 @@ func NewAuthHTTPHandler(
 // @Accept      json
 // @Produce     json
 // @Router      /auth/register [post]
-func (h *authHTTPHandler) HandleRegister(w http.ResponseWriter, r *http.Request) {
+func (h *authHTTPHandler) Register(w http.ResponseWriter, r *http.Request) {
 	var reqBody domain.RegisterInput
 	if err := ReadJSON(w, r, &reqBody); err != nil {
 		h.logger.Errorw("failed to parse JSON data", "error", err)
@@ -65,6 +65,38 @@ func (h *authHTTPHandler) HandleRegister(w http.ResponseWriter, r *http.Request)
 
 	response := contracts.APIResponse{Data: tokens}
 	if err := WriteJSON(w, http.StatusCreated, response); err != nil {
+		h.logger.Errorw("failed to write response", "error", err)
+	}
+}
+
+func (h *authHTTPHandler) Login(w http.ResponseWriter, r *http.Request) {
+	var reqBody domain.LoginInput
+	if err := ReadJSON(w, r, &reqBody); err != nil {
+		h.logger.Errorw("failed to parse JSON data", "error", err)
+		http.Error(w, "failed to parse JSON data", http.StatusBadRequest)
+		return
+	}
+
+	if err := h.validator.Struct(&reqBody); err != nil {
+		h.logger.Warnw("login data validation failed", "error", err)
+		http.Error(w, "login data validation failed", http.StatusBadRequest)
+		return
+	}
+
+	tokens, err := h.authClient.Login(r.Context(), reqBody.ToProto())
+	if err != nil {
+		code, msg := errors.ToHTTPError(err)
+		if code >= 500 {
+			h.logger.Errorw("login failed", "error", err)
+		} else {
+			h.logger.Warnw("login rejected", "error", err, "status", code)
+		}
+		http.Error(w, msg, code)
+		return
+	}
+
+	response := contracts.APIResponse{Data: tokens}
+	if err := WriteJSON(w, http.StatusOK, response); err != nil {
 		h.logger.Errorw("failed to write response", "error", err)
 	}
 }

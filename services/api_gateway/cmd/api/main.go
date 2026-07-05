@@ -121,7 +121,8 @@ func (a *app) initRouter() chi.Router {
 	))
 
 	router.Route("/api/v1", func(r chi.Router) {
-		r.Post("/auth/register", authHandler.HandleRegister)
+		r.Post("/auth/register", authHandler.Register)
+		r.Post("/auth/login", authHandler.Login)
 	})
 
 	return router
