@@ -6,6 +6,7 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
+	"go.uber.org/zap"
 
 	"github.com/mykytakuzminov/ridely-svc/services/auth_service/internal/domain"
 	"github.com/mykytakuzminov/ridely-svc/shared/env"
@@ -41,21 +42,26 @@ func (c *jwtConfig) validate() error {
 }
 
 type jwtManager struct {
-	cfg *jwtConfig
+	cfg    *jwtConfig
+	logger *zap.SugaredLogger
 }
 
-func NewManager() (domain.TokenManager, error) {
+func NewManager(logger *zap.SugaredLogger) (domain.TokenManager, error) {
 	cfg, err := newJWTConfig()
 	if err != nil {
 		return nil, fmt.Errorf("load config: %w", err)
 	}
-	return &jwtManager{cfg: cfg}, nil
+	return &jwtManager{
+		cfg:    cfg,
+		logger: logger,
+	}, nil
 }
 
 func (m *jwtManager) GenerateAccessToken(userID uuid.UUID, role string) (string, error) {
 	token, err := m.generateJWT(userID, role, m.cfg.AccessTTL)
 	if err != nil {
-		return "", err
+		m.logger.Errorw("failed to generate access token", "error", err)
+		return "", fmt.Errorf("generate access token: %w", err)
 	}
 	return token, nil
 }
@@ -63,7 +69,8 @@ func (m *jwtManager) GenerateAccessToken(userID uuid.UUID, role string) (string,
 func (m *jwtManager) GenerateRefreshToken(userID uuid.UUID, role string) (string, error) {
 	token, err := m.generateJWT(userID, role, m.cfg.RefreshTTL)
 	if err != nil {
-		return "", err
+		m.logger.Errorw("failed to generate refresh token", "error", err)
+		return "", fmt.Errorf("generate refresh token: %w", err)
 	}
 	return token, nil
 }
@@ -76,11 +83,13 @@ func (m *jwtManager) Parse(token string) (*domain.Claims, error) {
 		return []byte(m.cfg.Secret), nil
 	})
 	if err != nil {
+		m.logger.Errorw("failed to parse token", "error", err)
 		return nil, domain.ErrInvalidToken
 	}
 
 	claims, ok := parsedToken.Claims.(jwt.MapClaims)
 	if !ok {
+		m.logger.Errorw("failed to get token claims", "error", err)
 		return nil, domain.ErrInvalidToken
 	}
 
@@ -118,7 +127,7 @@ func (m *jwtManager) generateJWT(userID uuid.UUID, role string, ttl time.Duratio
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	signedToken, err := token.SignedString([]byte(m.cfg.Secret))
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("signing token: %w", err)
 	}
 
 	return signedToken, nil
@@ -127,6 +136,7 @@ func (m *jwtManager) generateJWT(userID uuid.UUID, role string, ttl time.Duratio
 func (m *jwtManager) getStringClaim(claims jwt.MapClaims, key string) (string, error) {
 	val, ok := claims[key].(string)
 	if !ok {
+		m.logger.Errorw("failed to get token claim")
 		return "", domain.ErrInvalidClaim
 	}
 	return val, nil

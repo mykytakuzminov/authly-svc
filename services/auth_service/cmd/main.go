@@ -72,7 +72,7 @@ func newApp(ctx context.Context, logger *zap.SugaredLogger) (*app, error) {
 	}
 	a.rdClient = rdClient
 
-	jwtManager, err := jwt.NewManager()
+	jwtManager, err := jwt.NewManager(logger)
 	if err != nil {
 		a.close()
 		return nil, fmt.Errorf("jwt manager init: %w", err)
