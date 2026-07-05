@@ -31,7 +31,12 @@ func (r *userRepository) Create(ctx context.Context, user *domain.User) error {
 	`
 
 	row := r.db.QueryRow(ctx, query, user.Email, user.PasswordHash)
-	if err := r.scanUser(row, user); err != nil {
+	if err := r.scanUser(row,
+		&user.ID,
+		&user.Role,
+		&user.CreatedAt,
+		&user.UpdatedAt,
+	); err != nil {
 		return err
 	}
 
@@ -62,15 +67,7 @@ func (r *userRepository) GetByEmail(ctx context.Context, email string) (*domain.
 	`
 	row := r.db.QueryRow(ctx, query, email)
 	user := &domain.User{}
-	if err := r.scanUser(row, user); err != nil {
-		return nil, err
-	}
-
-	return user, nil
-}
-
-func (r *userRepository) scanUser(row pgx.Row, user *domain.User) error {
-	if err := row.Scan(
+	if err := r.scanUser(row,
 		&user.ID,
 		&user.Email,
 		&user.PasswordHash,
@@ -78,6 +75,14 @@ func (r *userRepository) scanUser(row pgx.Row, user *domain.User) error {
 		&user.CreatedAt,
 		&user.UpdatedAt,
 	); err != nil {
+		return nil, err
+	}
+
+	return user, nil
+}
+
+func (r *userRepository) scanUser(row pgx.Row, dest ...any) error {
+	if err := row.Scan(dest...); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return domain.ErrUserNotFound
 		}
