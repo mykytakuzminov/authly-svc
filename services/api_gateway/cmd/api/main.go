@@ -123,6 +123,7 @@ func (a *app) initRouter() chi.Router {
 		httpSwagger.URL("http://localhost:8080/swagger/doc.json"),
 	))
 
+	router.Use(http.CORSMiddleware)
 	router.Use(http.TimeoutMiddleware)
 	router.Use(http.TraceMiddleware)
 
