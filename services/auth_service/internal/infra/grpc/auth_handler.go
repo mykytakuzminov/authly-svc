@@ -9,7 +9,9 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/mykytakuzminov/ridely-svc/services/auth_service/internal/domain"
+	c "github.com/mykytakuzminov/ridely-svc/shared/context"
 	"github.com/mykytakuzminov/ridely-svc/shared/errors"
+	log "github.com/mykytakuzminov/ridely-svc/shared/logging"
 	authpb "github.com/mykytakuzminov/ridely-svc/shared/proto/auth"
 )
 
@@ -33,12 +35,14 @@ func NewAuthHandler(
 }
 
 func (h *authGrpcHandler) Register(ctx context.Context, req *authpb.RegisterRequest) (*authpb.RegisterResponse, error) {
+	traceID := c.GetTraceID(ctx)
+
 	input := &domain.RegisterInput{
 		Email:    req.Email,
 		Password: req.Password,
 	}
 	if err := h.validator.Struct(input); err != nil {
-		h.logger.Warnw("registration data validation failed", "error", err)
+		log.FailedValidateData(h.logger, traceID, err)
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
@@ -54,12 +58,14 @@ func (h *authGrpcHandler) Register(ctx context.Context, req *authpb.RegisterRequ
 }
 
 func (h *authGrpcHandler) Login(ctx context.Context, req *authpb.LoginRequest) (*authpb.LoginResponse, error) {
+	traceID := c.GetTraceID(ctx)
+
 	input := &domain.LoginInput{
 		Email:    req.Email,
 		Password: req.Password,
 	}
 	if err := h.validator.Struct(input); err != nil {
-		h.logger.Warnw("login data validation failed", "error", err)
+		log.FailedValidateData(h.logger, traceID, err)
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
@@ -71,5 +77,20 @@ func (h *authGrpcHandler) Login(ctx context.Context, req *authpb.LoginRequest) (
 	return &authpb.LoginResponse{
 		AccessToken:  tokens.AccessToken,
 		RefreshToken: tokens.RefreshToken,
+	}, nil
+}
+
+func (h *authGrpcHandler) ValidateToken(
+	ctx context.Context,
+	req *authpb.ValidateTokenRequest,
+) (*authpb.ValidateTokenResponse, error) {
+	claims, err := h.authSvc.ValidateToken(ctx, req.Token)
+	if err != nil {
+		return nil, errors.ToGRPCError(err)
+	}
+
+	return &authpb.ValidateTokenResponse{
+		UserId: claims.UserID.String(),
+		Role:   claims.Role,
 	}, nil
 }

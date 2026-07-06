@@ -1,12 +1,16 @@
 package jwt
 
 import (
+	"context"
 	"fmt"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
+
+	c "github.com/mykytakuzminov/ridely-svc/shared/context"
+	log "github.com/mykytakuzminov/ridely-svc/shared/logging"
 
 	"github.com/mykytakuzminov/ridely-svc/services/auth_service/internal/domain"
 	"github.com/mykytakuzminov/ridely-svc/shared/env"
@@ -57,25 +61,33 @@ func NewManager(logger *zap.SugaredLogger) (domain.TokenManager, error) {
 	}, nil
 }
 
-func (m *jwtManager) GenerateAccessToken(userID uuid.UUID, role string) (string, error) {
+func (m *jwtManager) GenerateAccessToken(ctx context.Context, userID uuid.UUID, role string) (string, error) {
+	traceID := c.GetTraceID(ctx)
+
 	token, err := m.generateJWT(userID, role, m.cfg.AccessTTL)
 	if err != nil {
-		m.logger.Errorw("failed to generate access token", "error", err)
+		log.Failed(m.logger, traceID, "access token generation", err)
 		return "", fmt.Errorf("generate access token: %w", err)
 	}
+
 	return token, nil
 }
 
-func (m *jwtManager) GenerateRefreshToken(userID uuid.UUID, role string) (string, error) {
+func (m *jwtManager) GenerateRefreshToken(ctx context.Context, userID uuid.UUID, role string) (string, error) {
+	traceID := c.GetTraceID(ctx)
+
 	token, err := m.generateJWT(userID, role, m.cfg.RefreshTTL)
 	if err != nil {
-		m.logger.Errorw("failed to generate refresh token", "error", err)
+		log.Failed(m.logger, traceID, "refresh token generation", err)
 		return "", fmt.Errorf("generate refresh token: %w", err)
 	}
+
 	return token, nil
 }
 
-func (m *jwtManager) Parse(token string) (*domain.Claims, error) {
+func (m *jwtManager) Parse(ctx context.Context, token string) (*domain.Claims, error) {
+	traceID := c.GetTraceID(ctx)
+
 	parsedToken, err := jwt.Parse(token, func(t *jwt.Token) (interface{}, error) {
 		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, domain.ErrInvalidSigningMethod
@@ -83,27 +95,30 @@ func (m *jwtManager) Parse(token string) (*domain.Claims, error) {
 		return []byte(m.cfg.Secret), nil
 	})
 	if err != nil {
-		m.logger.Errorw("failed to parse token", "error", err)
+		log.Failed(m.logger, traceID, "token parsing", err)
 		return nil, domain.ErrInvalidToken
 	}
 
 	claims, ok := parsedToken.Claims.(jwt.MapClaims)
 	if !ok {
-		m.logger.Errorw("failed to get token claims")
+		log.Failed(m.logger, traceID, "token claims extraction", domain.ErrInvalidToken)
 		return nil, domain.ErrInvalidToken
 	}
 
 	sub, err := m.getStringClaim(claims, "sub")
 	if err != nil {
+		log.Failed(m.logger, traceID, "token claims extraction", err)
 		return nil, err
 	}
 	role, err := m.getStringClaim(claims, "role")
 	if err != nil {
+		log.Failed(m.logger, traceID, "token claims extraction", err)
 		return nil, err
 	}
 
 	userID, err := uuid.Parse(sub)
 	if err != nil {
+		log.Failed(m.logger, traceID, "user id parsing", err)
 		return nil, err
 	}
 
@@ -136,7 +151,6 @@ func (m *jwtManager) generateJWT(userID uuid.UUID, role string, ttl time.Duratio
 func (m *jwtManager) getStringClaim(claims jwt.MapClaims, key string) (string, error) {
 	val, ok := claims[key].(string)
 	if !ok {
-		m.logger.Errorw("failed to get token claim")
 		return "", domain.ErrInvalidClaim
 	}
 	return val, nil

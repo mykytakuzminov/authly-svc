@@ -15,4 +15,5 @@ type LoginInput struct {
 type AuthService interface {
 	Register(ctx context.Context, input *RegisterInput) (*TokenPair, error)
 	Login(ctx context.Context, input *LoginInput) (*TokenPair, error)
+	ValidateToken(ctx context.Context, token string) (*Claims, error)
 }

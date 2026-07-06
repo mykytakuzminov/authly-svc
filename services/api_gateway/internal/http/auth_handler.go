@@ -8,8 +8,10 @@ import (
 	"github.com/go-playground/validator/v10"
 
 	"github.com/mykytakuzminov/ridely-svc/services/api_gateway/internal/domain"
+	c "github.com/mykytakuzminov/ridely-svc/shared/context"
 	"github.com/mykytakuzminov/ridely-svc/shared/contracts"
 	"github.com/mykytakuzminov/ridely-svc/shared/errors"
+	log "github.com/mykytakuzminov/ridely-svc/shared/logging"
 	authpb "github.com/mykytakuzminov/ridely-svc/shared/proto/auth"
 )
 
@@ -38,16 +40,18 @@ func NewAuthHTTPHandler(
 // @Produce     json
 // @Router      /auth/register [post]
 func (h *authHTTPHandler) Register(w http.ResponseWriter, r *http.Request) {
+	traceID := c.GetTraceID(r.Context())
+
 	var reqBody domain.RegisterInput
 	if err := ReadJSON(w, r, &reqBody); err != nil {
-		h.logger.Errorw("failed to parse JSON data", "error", err)
-		http.Error(w, "failed to parse JSON data", http.StatusBadRequest)
+		log.FailedParseJSON(h.logger, traceID, err)
+		responseBadRequest(w, "failed to parse JSON data")
 		return
 	}
 
 	if err := h.validator.Struct(&reqBody); err != nil {
-		h.logger.Warnw("registration data validation failed", "error", err)
-		http.Error(w, "registration data validation failed", http.StatusBadRequest)
+		log.FailedValidateData(h.logger, traceID, err)
+		responseBadRequest(w, "failed to validate data")
 		return
 	}
 
@@ -55,9 +59,9 @@ func (h *authHTTPHandler) Register(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		code, msg := errors.ToHTTPError(err)
 		if code >= 500 {
-			h.logger.Errorw("register failed", "error", err)
+			log.Failed(h.logger, traceID, "registration", err)
 		} else {
-			h.logger.Warnw("register rejected", "error", err, "status", code)
+			log.Declined(h.logger, traceID, "registration", err)
 		}
 		http.Error(w, msg, code)
 		return
@@ -65,21 +69,23 @@ func (h *authHTTPHandler) Register(w http.ResponseWriter, r *http.Request) {
 
 	response := contracts.APIResponse{Data: tokens}
 	if err := WriteJSON(w, http.StatusCreated, response); err != nil {
-		h.logger.Errorw("failed to write response", "error", err)
+		log.FailedWriteResponse(h.logger, traceID, err)
 	}
 }
 
 func (h *authHTTPHandler) Login(w http.ResponseWriter, r *http.Request) {
+	traceID := c.GetTraceID(r.Context())
+
 	var reqBody domain.LoginInput
 	if err := ReadJSON(w, r, &reqBody); err != nil {
-		h.logger.Errorw("failed to parse JSON data", "error", err)
-		http.Error(w, "failed to parse JSON data", http.StatusBadRequest)
+		log.FailedParseJSON(h.logger, traceID, err)
+		responseBadRequest(w, "failed to parse JSON data")
 		return
 	}
 
 	if err := h.validator.Struct(&reqBody); err != nil {
-		h.logger.Warnw("login data validation failed", "error", err)
-		http.Error(w, "login data validation failed", http.StatusBadRequest)
+		log.FailedValidateData(h.logger, traceID, err)
+		responseBadRequest(w, "failed to validate data")
 		return
 	}
 
@@ -87,9 +93,9 @@ func (h *authHTTPHandler) Login(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		code, msg := errors.ToHTTPError(err)
 		if code >= 500 {
-			h.logger.Errorw("login failed", "error", err)
+			log.Failed(h.logger, traceID, "login", err)
 		} else {
-			h.logger.Warnw("login rejected", "error", err, "status", code)
+			log.Declined(h.logger, traceID, "login", err)
 		}
 		http.Error(w, msg, code)
 		return
@@ -97,6 +103,6 @@ func (h *authHTTPHandler) Login(w http.ResponseWriter, r *http.Request) {
 
 	response := contracts.APIResponse{Data: tokens}
 	if err := WriteJSON(w, http.StatusOK, response); err != nil {
-		h.logger.Errorw("failed to write response", "error", err)
+		log.FailedWriteResponse(h.logger, traceID, err)
 	}
 }

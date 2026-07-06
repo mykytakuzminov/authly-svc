@@ -119,6 +119,10 @@ func (a *app) initRouter() chi.Router {
 
 	router := chi.NewRouter()
 
+	router.Use(http.CORSMiddleware)
+	router.Use(http.TimeoutMiddleware)
+	router.Use(http.TraceMiddleware)
+
 	router.Get("/swagger/*", httpSwagger.Handler(
 		httpSwagger.URL("http://localhost:8080/swagger/doc.json"),
 	))
@@ -126,6 +130,10 @@ func (a *app) initRouter() chi.Router {
 	router.Route("/api/v1", func(r chi.Router) {
 		r.Post("/auth/register", authHandler.Register)
 		r.Post("/auth/login", authHandler.Login)
+
+		r.Group(func(protected chi.Router) {
+			protected.Use(http.AuthMiddleware(a.authClient.Client, a.logger))
+		})
 	})
 
 	return router
