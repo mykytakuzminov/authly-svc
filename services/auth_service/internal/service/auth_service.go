@@ -97,6 +97,14 @@ func (s *authService) Login(ctx context.Context, input *domain.LoginInput) (*dom
 	return tokens, nil
 }
 
+func (s *authService) ValidateToken(ctx context.Context, token string) (*domain.Claims, error) {
+	claims, err := s.jwtManager.Parse(ctx, token)
+	if err != nil {
+		return nil, err
+	}
+	return claims, nil
+}
+
 func (s *authService) generateAndSaveTokens(ctx context.Context, user *domain.User) (*domain.TokenPair, error) {
 	// Generate tokens
 	accessToken, err := s.jwtManager.GenerateAccessToken(ctx, user.ID, user.Role)

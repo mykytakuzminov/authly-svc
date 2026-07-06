@@ -79,3 +79,18 @@ func (h *authGrpcHandler) Login(ctx context.Context, req *authpb.LoginRequest) (
 		RefreshToken: tokens.RefreshToken,
 	}, nil
 }
+
+func (h *authGrpcHandler) ValidateToken(
+	ctx context.Context,
+	req *authpb.ValidateTokenRequest,
+) (*authpb.ValidateTokenResponse, error) {
+	claims, err := h.authSvc.ValidateToken(ctx, req.Token)
+	if err != nil {
+		return nil, errors.ToGRPCError(err)
+	}
+
+	return &authpb.ValidateTokenResponse{
+		UserId: claims.UserID.String(),
+		Role:   claims.Role,
+	}, nil
+}

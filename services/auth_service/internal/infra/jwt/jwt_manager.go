@@ -107,15 +107,18 @@ func (m *jwtManager) Parse(ctx context.Context, token string) (*domain.Claims, e
 
 	sub, err := m.getStringClaim(claims, "sub")
 	if err != nil {
+		log.Failed(m.logger, traceID, "token claims extraction", err)
 		return nil, err
 	}
 	role, err := m.getStringClaim(claims, "role")
 	if err != nil {
+		log.Failed(m.logger, traceID, "token claims extraction", err)
 		return nil, err
 	}
 
 	userID, err := uuid.Parse(sub)
 	if err != nil {
+		log.Failed(m.logger, traceID, "user id parsing", err)
 		return nil, err
 	}
 
