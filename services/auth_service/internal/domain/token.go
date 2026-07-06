@@ -24,9 +24,9 @@ type Claims struct {
 }
 
 type TokenManager interface {
-	GenerateAccessToken(userID uuid.UUID, role string) (string, error)
-	GenerateRefreshToken(userID uuid.UUID, role string) (string, error)
-	Parse(token string) (*Claims, error)
+	GenerateAccessToken(ctx context.Context, userID uuid.UUID, role string) (string, error)
+	GenerateRefreshToken(ctx context.Context, userID uuid.UUID, role string) (string, error)
+	Parse(ctx context.Context, token string) (*Claims, error)
 	GetRefreshTTL() time.Duration
 }
 

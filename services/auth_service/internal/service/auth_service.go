@@ -2,9 +2,13 @@ package service
 
 import (
 	"context"
+	"fmt"
 
 	"go.uber.org/zap"
 	"golang.org/x/crypto/bcrypt"
+
+	c "github.com/mykytakuzminov/ridely-svc/shared/context"
+	log "github.com/mykytakuzminov/ridely-svc/shared/logging"
 
 	"github.com/mykytakuzminov/ridely-svc/services/auth_service/internal/domain"
 )
@@ -31,20 +35,22 @@ func NewAuthService(
 }
 
 func (s *authService) Register(ctx context.Context, input *domain.RegisterInput) (*domain.TokenPair, error) {
+	traceID := c.GetTraceID(ctx)
+
 	// Check existence
 	exists, err := s.userRepo.ExistsByEmail(ctx, input.Email)
 	if err != nil {
 		return nil, err
 	}
 	if exists {
-		s.logger.Warnw("registration rejected, user already exists", "email", input.Email)
+		log.Declined(s.logger, traceID, "registration", err)
 		return nil, domain.ErrUserAlreadyExists
 	}
 
 	// Hash password
 	hpwd, err := bcrypt.GenerateFromPassword([]byte(input.Password), 12)
 	if err != nil {
-		s.logger.Errorw("registration rejected, failed to hash password", "error", err)
+		log.Failed(s.logger, traceID, "registration", err)
 		return nil, err
 	}
 
@@ -61,20 +67,22 @@ func (s *authService) Register(ctx context.Context, input *domain.RegisterInput)
 	}
 
 	// Return tokens
-	s.logger.Infow("user registered successfully", "user_id", user.ID)
+	log.Success(s.logger, traceID, "registration")
 	return tokens, nil
 }
 
 func (s *authService) Login(ctx context.Context, input *domain.LoginInput) (*domain.TokenPair, error) {
+	traceID := c.GetTraceID(ctx)
+
 	// Check existence
 	user, err := s.userRepo.GetByEmail(ctx, input.Email)
 	if err != nil {
-		s.logger.Warnw("login failed, invalid email", "email", input.Email)
+		log.Failed(s.logger, traceID, "login", fmt.Errorf("invalid email"))
 		return nil, domain.ErrInvalidCredentials
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(input.Password)); err != nil {
-		s.logger.Warnw("login failed, invalid password")
+		log.Failed(s.logger, traceID, "login", fmt.Errorf("invalid password"))
 		return nil, domain.ErrInvalidCredentials
 	}
 
@@ -85,17 +93,17 @@ func (s *authService) Login(ctx context.Context, input *domain.LoginInput) (*dom
 	}
 
 	// Return tokens
-	s.logger.Infow("user logged in successfully", "user_id", user.ID)
+	log.Success(s.logger, traceID, "login")
 	return tokens, nil
 }
 
 func (s *authService) generateAndSaveTokens(ctx context.Context, user *domain.User) (*domain.TokenPair, error) {
 	// Generate tokens
-	accessToken, err := s.jwtManager.GenerateAccessToken(user.ID, user.Role)
+	accessToken, err := s.jwtManager.GenerateAccessToken(ctx, user.ID, user.Role)
 	if err != nil {
 		return nil, err
 	}
-	refreshToken, err := s.jwtManager.GenerateRefreshToken(user.ID, user.Role)
+	refreshToken, err := s.jwtManager.GenerateRefreshToken(ctx, user.ID, user.Role)
 	if err != nil {
 		return nil, err
 	}

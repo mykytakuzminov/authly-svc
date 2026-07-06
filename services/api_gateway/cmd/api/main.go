@@ -124,6 +124,7 @@ func (a *app) initRouter() chi.Router {
 	))
 
 	router.Use(http.TimeoutMiddleware)
+	router.Use(http.TraceMiddleware)
 
 	router.Route("/api/v1", func(r chi.Router) {
 		r.Post("/auth/register", authHandler.Register)
