@@ -40,15 +40,33 @@ func (c *grpcServerConfig) getAddr() string {
 	return c.Host + ":" + c.Port
 }
 
+type grpcServerOptions struct {
+	registerFns []RegisterFn
+	serverOpts  []grpc.ServerOption
+}
+
+type RegisterFn func(*grpc.Server)
+type Option func(*grpcServerOptions)
+
+func WithRegisterFn(fn RegisterFn) Option {
+	return func(gso *grpcServerOptions) {
+		gso.registerFns = append(gso.registerFns, fn)
+	}
+}
+
+func WithServerOption(opt grpc.ServerOption) Option {
+	return func(gso *grpcServerOptions) {
+		gso.serverOpts = append(gso.serverOpts, opt)
+	}
+}
+
 type GRPCServer struct {
 	server   *grpc.Server
 	listener net.Listener
 	logger   *zap.SugaredLogger
 }
 
-type RegisterFn func(*grpc.Server)
-
-func NewGRPCServer(logger *zap.SugaredLogger, registerFns ...RegisterFn) (*GRPCServer, error) {
+func NewGRPCServer(logger *zap.SugaredLogger, opts ...Option) (*GRPCServer, error) {
 	cfg, err := newGRPCServerConfig()
 	if err != nil {
 		return nil, fmt.Errorf("load config: %w", err)
@@ -59,9 +77,14 @@ func NewGRPCServer(logger *zap.SugaredLogger, registerFns ...RegisterFn) (*GRPCS
 		return nil, fmt.Errorf("listen: %w", err)
 	}
 
-	grpcServer := grpc.NewServer()
+	options := &grpcServerOptions{}
+	for _, opt := range opts {
+		opt(options)
+	}
 
-	for _, register := range registerFns {
+	grpcServer := grpc.NewServer(options.serverOpts...)
+
+	for _, register := range options.registerFns {
 		register(grpcServer)
 	}
 
