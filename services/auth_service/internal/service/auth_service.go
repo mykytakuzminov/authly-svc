@@ -7,6 +7,8 @@ import (
 	"go.uber.org/zap"
 	"golang.org/x/crypto/bcrypt"
 
+	"github.com/google/uuid"
+
 	c "github.com/mykytakuzminov/ridely-svc/shared/context"
 	log "github.com/mykytakuzminov/ridely-svc/shared/logging"
 
@@ -61,7 +63,7 @@ func (s *authService) Register(ctx context.Context, input *domain.RegisterInput)
 	}
 
 	// Generate and save tokens
-	tokens, err := s.generateAndSaveTokens(ctx, user)
+	tokens, err := s.generateAndSaveTokens(ctx, user.ID, user.Role)
 	if err != nil {
 		return nil, err
 	}
@@ -74,20 +76,21 @@ func (s *authService) Register(ctx context.Context, input *domain.RegisterInput)
 func (s *authService) Login(ctx context.Context, input *domain.LoginInput) (*domain.TokenPair, error) {
 	traceID := c.GetTraceID(ctx)
 
-	// Check existence
+	// Check email
 	user, err := s.userRepo.GetByEmail(ctx, input.Email)
 	if err != nil {
 		log.Failed(s.logger, traceID, "login", fmt.Errorf("invalid email"))
 		return nil, domain.ErrInvalidCredentials
 	}
 
+	// Check password
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(input.Password)); err != nil {
 		log.Failed(s.logger, traceID, "login", fmt.Errorf("invalid password"))
 		return nil, domain.ErrInvalidCredentials
 	}
 
 	// Generate and save tokens
-	tokens, err := s.generateAndSaveTokens(ctx, user)
+	tokens, err := s.generateAndSaveTokens(ctx, user.ID, user.Role)
 	if err != nil {
 		return nil, err
 	}
@@ -97,21 +100,56 @@ func (s *authService) Login(ctx context.Context, input *domain.LoginInput) (*dom
 	return tokens, nil
 }
 
-func (s *authService) ValidateToken(ctx context.Context, token string) (*domain.Claims, error) {
-	claims, err := s.jwtManager.Parse(ctx, token)
+func (s *authService) Refresh(ctx context.Context, input *domain.RefreshInput) (*domain.TokenPair, error) {
+	traceID := c.GetTraceID(ctx)
+
+	// Check token existence
+	if _, err := s.tokenRepo.Get(ctx, input.RefreshToken); err != nil {
+		log.Declined(s.logger, traceID, "token refreshing", err)
+		return nil, err
+	}
+
+	// Get token claims
+	claims, err := s.jwtManager.Parse(ctx, input.RefreshToken)
+	if err != nil {
+		return nil, err
+	}
+
+	// Delete old refresh token
+	if err := s.tokenRepo.Delete(ctx, input.RefreshToken); err != nil {
+		return nil, err
+	}
+
+	// Generate and save tokens
+	tokens, err := s.generateAndSaveTokens(ctx, claims.UserID, claims.Role)
+	if err != nil {
+		return nil, err
+	}
+
+	// Return tokens
+	log.Success(s.logger, traceID, "token refreshing")
+	return tokens, nil
+}
+
+func (s *authService) Validate(ctx context.Context, input *domain.ValidateInput) (*domain.Claims, error) {
+	claims, err := s.jwtManager.Parse(ctx, input.AccessToken)
 	if err != nil {
 		return nil, err
 	}
 	return claims, nil
 }
 
-func (s *authService) generateAndSaveTokens(ctx context.Context, user *domain.User) (*domain.TokenPair, error) {
+func (s *authService) generateAndSaveTokens(
+	ctx context.Context,
+	userID uuid.UUID,
+	role string,
+) (*domain.TokenPair, error) {
 	// Generate tokens
-	accessToken, err := s.jwtManager.GenerateAccessToken(ctx, user.ID, user.Role)
+	accessToken, err := s.jwtManager.GenerateAccessToken(ctx, userID, role)
 	if err != nil {
 		return nil, err
 	}
-	refreshToken, err := s.jwtManager.GenerateRefreshToken(ctx, user.ID, user.Role)
+	refreshToken, err := s.jwtManager.GenerateRefreshToken(ctx, userID, role)
 	if err != nil {
 		return nil, err
 	}
@@ -119,7 +157,7 @@ func (s *authService) generateAndSaveTokens(ctx context.Context, user *domain.Us
 	// Save refresh token
 	if err := s.tokenRepo.Set(ctx, &domain.RefreshToken{
 		Token:  refreshToken,
-		UserID: user.ID,
+		UserID: userID,
 		TTL:    s.jwtManager.GetRefreshTTL(),
 	}); err != nil {
 		return nil, err

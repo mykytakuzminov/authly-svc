@@ -106,3 +106,37 @@ func (h *authHTTPHandler) Login(w http.ResponseWriter, r *http.Request) {
 		log.FailedWriteResponse(h.logger, traceID, err)
 	}
 }
+
+func (h *authHTTPHandler) Refresh(w http.ResponseWriter, r *http.Request) {
+	traceID := c.GetTraceID(r.Context())
+
+	var reqBody domain.RefreshInput
+	if err := ReadJSON(w, r, &reqBody); err != nil {
+		log.FailedParseJSON(h.logger, traceID, err)
+		responseBadRequest(w, "failed to parse JSON data")
+		return
+	}
+
+	if err := h.validator.Struct(&reqBody); err != nil {
+		log.FailedValidateData(h.logger, traceID, err)
+		responseBadRequest(w, "failed to validate data")
+		return
+	}
+
+	tokens, err := h.authClient.Refresh(r.Context(), reqBody.ToProto())
+	if err != nil {
+		code, msg := errors.ToHTTPError(err)
+		if code >= 500 {
+			log.Failed(h.logger, traceID, "token refreshing", err)
+		} else {
+			log.Declined(h.logger, traceID, "token refreshing", err)
+		}
+		http.Error(w, msg, code)
+		return
+	}
+
+	response := contracts.APIResponse{Data: tokens}
+	if err := WriteJSON(w, http.StatusOK, response); err != nil {
+		log.FailedWriteResponse(h.logger, traceID, err)
+	}
+}

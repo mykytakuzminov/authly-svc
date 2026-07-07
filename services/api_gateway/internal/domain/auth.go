@@ -25,3 +25,13 @@ func (i *LoginInput) ToProto() *authpb.LoginRequest {
 		Password: i.Password,
 	}
 }
+
+type RefreshInput struct {
+	RefreshToken string `json:"refresh_token" validate:"required"`
+}
+
+func (i *RefreshInput) ToProto() *authpb.RefreshRequest {
+	return &authpb.RefreshRequest{
+		RefreshToken: i.RefreshToken,
+	}
+}
