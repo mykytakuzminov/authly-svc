@@ -80,16 +80,48 @@ func (h *authGrpcHandler) Login(ctx context.Context, req *authpb.LoginRequest) (
 	}, nil
 }
 
-func (h *authGrpcHandler) ValidateToken(
-	ctx context.Context,
-	req *authpb.ValidateTokenRequest,
-) (*authpb.ValidateTokenResponse, error) {
-	claims, err := h.authSvc.ValidateToken(ctx, req.Token)
+func (h *authGrpcHandler) Refresh(ctx context.Context, req *authpb.RefreshRequest) (*authpb.RefreshResponse, error) {
+	traceID := c.GetTraceID(ctx)
+
+	input := &domain.RefreshInput{
+		RefreshToken: req.RefreshToken,
+	}
+	if err := h.validator.Struct(input); err != nil {
+		log.FailedValidateData(h.logger, traceID, err)
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
+	tokens, err := h.authSvc.Refresh(ctx, input)
 	if err != nil {
 		return nil, errors.ToGRPCError(err)
 	}
 
-	return &authpb.ValidateTokenResponse{
+	return &authpb.RefreshResponse{
+		AccessToken:  tokens.AccessToken,
+		RefreshToken: tokens.RefreshToken,
+	}, nil
+}
+
+func (h *authGrpcHandler) Validate(
+	ctx context.Context,
+	req *authpb.ValidateRequest,
+) (*authpb.ValidateResponse, error) {
+	traceID := c.GetTraceID(ctx)
+
+	input := &domain.ValidateInput{
+		AccessToken: req.AccessToken,
+	}
+	if err := h.validator.Struct(input); err != nil {
+		log.FailedValidateData(h.logger, traceID, err)
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
+	claims, err := h.authSvc.Validate(ctx, input)
+	if err != nil {
+		return nil, errors.ToGRPCError(err)
+	}
+
+	return &authpb.ValidateResponse{
 		UserId: claims.UserID.String(),
 		Role:   claims.Role,
 	}, nil

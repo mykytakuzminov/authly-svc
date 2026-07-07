@@ -54,14 +54,14 @@ func AuthMiddleware(client authpb.AuthServiceClient, logger *zap.SugaredLogger) 
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			traceID := c.GetTraceID(r.Context())
 
-			token := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
-			if token == "" {
+			accessToken := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
+			if accessToken == "" {
 				responseUnauthorized(w, "missing token")
 				return
 			}
 
-			claims, err := client.ValidateToken(r.Context(), &authpb.ValidateTokenRequest{
-				Token: token,
+			claims, err := client.Validate(r.Context(), &authpb.ValidateRequest{
+				AccessToken: accessToken,
 			})
 			if err != nil {
 				log.Declined(logger, traceID, "token validation", err)
