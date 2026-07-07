@@ -7,6 +7,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/mykytakuzminov/ridely-svc/shared/env"
+	i "github.com/mykytakuzminov/ridely-svc/shared/interceptors"
 	authpb "github.com/mykytakuzminov/ridely-svc/shared/proto/auth"
 )
 
@@ -18,7 +19,11 @@ type AuthServiceClient struct {
 func NewAuthServiceClient() (*AuthServiceClient, error) {
 	addr := env.GetString("AUTH_SERVICE_ADDR", "0.0.0.0:50051")
 
-	conn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	conn, err := grpc.NewClient(
+		addr,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithUnaryInterceptor(i.TraceClientInterceptor),
+	)
 	if err != nil {
 		return nil, fmt.Errorf("connect auth service: %w", err)
 	}

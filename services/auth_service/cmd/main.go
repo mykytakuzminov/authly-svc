@@ -22,6 +22,7 @@ import (
 	"github.com/mykytakuzminov/ridely-svc/services/auth_service/internal/infra/repository"
 	"github.com/mykytakuzminov/ridely-svc/services/auth_service/internal/service"
 	"github.com/mykytakuzminov/ridely-svc/shared/db"
+	i "github.com/mykytakuzminov/ridely-svc/shared/interceptors"
 	"github.com/mykytakuzminov/ridely-svc/shared/migrate"
 	authpb "github.com/mykytakuzminov/ridely-svc/shared/proto/auth"
 	"github.com/mykytakuzminov/ridely-svc/shared/server"
@@ -84,9 +85,12 @@ func newApp(ctx context.Context, logger *zap.SugaredLogger) (*app, error) {
 	authSvc := service.NewAuthService(userRepo, tokenRepo, jwtManager, logger)
 	authHandler := grpc.NewAuthHandler(authSvc, validator.New(), logger)
 
-	grpcServer, err := server.NewGRPCServer(logger, func(s *grpclib.Server) {
-		authpb.RegisterAuthServiceServer(s, authHandler)
-	})
+	grpcServer, err := server.NewGRPCServer(logger,
+		server.WithRegisterFn(func(s *grpclib.Server) {
+			authpb.RegisterAuthServiceServer(s, authHandler)
+		}),
+		server.WithServerOption(grpclib.UnaryInterceptor(i.TraceServerInterceptor)),
+	)
 	if err != nil {
 		a.close()
 		return nil, fmt.Errorf("grpc server init: %w", err)
