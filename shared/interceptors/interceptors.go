@@ -46,3 +46,37 @@ func TraceServerInterceptor(ctx context.Context,
 	ctx = context.WithValue(ctx, c.TraceIDKey, traceID)
 	return handler(ctx, req)
 }
+
+func UserContextClientInterceptor(
+	ctx context.Context,
+	method string,
+	req, reply interface{},
+	cc *grpc.ClientConn,
+	invoker grpc.UnaryInvoker,
+	opts ...grpc.CallOption,
+) error {
+	if userID, ok := c.GetUserID(ctx); ok {
+		ctx = metadata.AppendToOutgoingContext(ctx, "user_id", userID.String())
+	}
+
+	return invoker(ctx, method, req, reply, cc, opts...)
+}
+
+func UserContextServerInterceptor(ctx context.Context,
+	req interface{},
+	info *grpc.UnaryServerInfo,
+	handler grpc.UnaryHandler,
+) (interface{}, error) {
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return handler(ctx, req)
+	}
+
+	if values := md.Get("user_id"); len(values) > 0 {
+		if userID, err := uuid.Parse(values[0]); err == nil {
+			ctx = context.WithValue(ctx, c.UserIDKey, userID)
+		}
+	}
+
+	return handler(ctx, req)
+}

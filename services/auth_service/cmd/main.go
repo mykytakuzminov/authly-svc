@@ -89,7 +89,10 @@ func newApp(ctx context.Context, logger *zap.SugaredLogger) (*app, error) {
 		server.WithRegisterFn(func(s *grpclib.Server) {
 			authpb.RegisterAuthServiceServer(s, authHandler)
 		}),
-		server.WithServerOption(grpclib.UnaryInterceptor(i.TraceServerInterceptor)),
+		server.WithServerOption(grpclib.ChainUnaryInterceptor(
+			i.TraceServerInterceptor,
+			i.UserContextServerInterceptor,
+		)),
 	)
 	if err != nil {
 		a.close()

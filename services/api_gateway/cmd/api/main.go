@@ -134,6 +134,8 @@ func (a *app) initRouter() chi.Router {
 
 		r.Group(func(protected chi.Router) {
 			protected.Use(http.AuthMiddleware(a.authClient.Client, a.logger))
+
+			protected.Post("/auth/logout", authHandler.Logout)
 		})
 	})
 
