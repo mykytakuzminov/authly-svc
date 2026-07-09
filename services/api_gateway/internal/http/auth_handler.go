@@ -9,7 +9,6 @@ import (
 
 	"github.com/mykytakuzminov/ridely-svc/services/api_gateway/internal/domain"
 	c "github.com/mykytakuzminov/ridely-svc/shared/context"
-	"github.com/mykytakuzminov/ridely-svc/shared/contracts"
 	"github.com/mykytakuzminov/ridely-svc/shared/errors"
 	log "github.com/mykytakuzminov/ridely-svc/shared/logging"
 	authpb "github.com/mykytakuzminov/ridely-svc/shared/proto/auth"
@@ -33,11 +32,16 @@ func NewAuthHTTPHandler(
 	}
 }
 
-// Register godoc
-// @Summary     Register a new user
+// @Summary     Register new user
+// @Description Register new user with credentials and return tokens
 // @Tags        auth
 // @Accept      json
 // @Produce     json
+// @Param       body body domain.RegisterInput true "Register credentials"
+// @Success     200 {object} SuccessResponse{data=domain.TokensResponse}
+// @Failure     400 {object} ErrorResponse "Bad request"
+// @Failure     409 {object} ErrorResponse "Conflict"
+// @Failure     500 {object} ErrorResponse "Internal server error"
 // @Router      /auth/register [post]
 func (h *authHTTPHandler) Register(w http.ResponseWriter, r *http.Request) {
 	traceID := c.GetTraceID(r.Context())
@@ -63,16 +67,24 @@ func (h *authHTTPHandler) Register(w http.ResponseWriter, r *http.Request) {
 		} else {
 			log.Declined(h.logger, traceID, "registration", err)
 		}
-		http.Error(w, msg, code)
+		responseError(w, code, msg)
 		return
 	}
 
-	response := contracts.APIResponse{Data: tokens}
-	if err := WriteJSON(w, http.StatusCreated, response); err != nil {
-		log.FailedWriteResponse(h.logger, traceID, err)
-	}
+	responseSuccess(w, domain.TokensResponseFromProto(tokens))
 }
 
+// @Summary     Authenticate user
+// @Description Authenticate user with credentials and return tokens
+// @Tags        auth
+// @Accept      json
+// @Produce     json
+// @Param       body body domain.LoginInput true "Login credentials"
+// @Success     200 {object} SuccessResponse{data=domain.TokensResponse}
+// @Failure     400 {object} ErrorResponse "Bad request"
+// @Failure     401 {object} ErrorResponse "Unauthenticated"
+// @Failure     500 {object} ErrorResponse "Internal server error"
+// @Router      /auth/login [post]
 func (h *authHTTPHandler) Login(w http.ResponseWriter, r *http.Request) {
 	traceID := c.GetTraceID(r.Context())
 
@@ -97,16 +109,24 @@ func (h *authHTTPHandler) Login(w http.ResponseWriter, r *http.Request) {
 		} else {
 			log.Declined(h.logger, traceID, "login", err)
 		}
-		http.Error(w, msg, code)
+		responseError(w, code, msg)
 		return
 	}
 
-	response := contracts.APIResponse{Data: tokens}
-	if err := WriteJSON(w, http.StatusOK, response); err != nil {
-		log.FailedWriteResponse(h.logger, traceID, err)
-	}
+	responseSuccess(w, domain.TokensResponseFromProto(tokens))
 }
 
+// @Summary     Refresh tokens
+// @Description Generate new tokens and return them to client
+// @Tags        auth
+// @Accept      json
+// @Produce     json
+// @Param       body body domain.RefreshInput true "Refresh token"
+// @Success     200 {object} SuccessResponse{data=domain.TokensResponse}
+// @Failure     400 {object} ErrorResponse "Bad request"
+// @Failure     401 {object} ErrorResponse "Unauthenticated"
+// @Failure     500 {object} ErrorResponse "Internal server error"
+// @Router      /auth/refresh [post]
 func (h *authHTTPHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 	traceID := c.GetTraceID(r.Context())
 
@@ -131,16 +151,25 @@ func (h *authHTTPHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 		} else {
 			log.Declined(h.logger, traceID, "token refreshing", err)
 		}
-		http.Error(w, msg, code)
+		responseError(w, code, msg)
 		return
 	}
 
-	response := contracts.APIResponse{Data: tokens}
-	if err := WriteJSON(w, http.StatusOK, response); err != nil {
-		log.FailedWriteResponse(h.logger, traceID, err)
-	}
+	responseSuccess(w, domain.TokensResponseFromProto(tokens))
 }
 
+// @Summary     Logout user
+// @Description Logout user and delete refresh token
+// @Tags        auth
+// @Accept      json
+// @Produce     json
+// @Param       body body domain.LogoutInput true "Delete token"
+// @Security    BearerAuth
+// @Success     204
+// @Failure     400 {object} ErrorResponse "Bad request"
+// @Failure     401 {object} ErrorResponse "Unauthenticated"
+// @Failure     500 {object} ErrorResponse "Internal server error"
+// @Router      /auth/logout [post]
 func (h *authHTTPHandler) Logout(w http.ResponseWriter, r *http.Request) {
 	traceID := c.GetTraceID(r.Context())
 
@@ -165,12 +194,9 @@ func (h *authHTTPHandler) Logout(w http.ResponseWriter, r *http.Request) {
 		} else {
 			log.Declined(h.logger, traceID, "logging out", err)
 		}
-		http.Error(w, msg, code)
+		responseError(w, code, msg)
 		return
 	}
 
-	response := contracts.APIResponse{Data: nil}
-	if err := WriteJSON(w, http.StatusOK, response); err != nil {
-		log.FailedWriteResponse(h.logger, traceID, err)
-	}
+	responseNoContent(w)
 }

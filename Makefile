@@ -55,3 +55,7 @@ migrate-down:
 
 migrate-create:
 	migrate create -ext sql -dir $(MIGRATIONS_DIR) -seq $(name)
+
+# ── Swagger Docs ──────────────────────────────────────────
+generate-docs:
+	swag init -g cmd/api/main.go --parseInternal -d services/api_gateway,shared -o docs

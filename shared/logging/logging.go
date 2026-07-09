@@ -15,10 +15,6 @@ func FailedValidateData(logger *zap.SugaredLogger, traceID uuid.UUID, err error)
 	logger.Warnw("failed to validate data", "trace_id", traceID, "error", err)
 }
 
-func FailedWriteResponse(logger *zap.SugaredLogger, traceID uuid.UUID, err error) {
-	logger.Errorw("failed to write response", "trace_id", traceID, "error", err)
-}
-
 func Failed(logger *zap.SugaredLogger, traceID uuid.UUID, what string, err error) {
 	logger.Errorw(fmt.Sprintf("%s failed", what), "trace_id", traceID, "error", err)
 }

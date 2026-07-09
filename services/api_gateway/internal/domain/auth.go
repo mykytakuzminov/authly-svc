@@ -45,3 +45,15 @@ func (i *LogoutInput) ToProto() *authpb.LogoutRequest {
 		RefreshToken: i.RefreshToken,
 	}
 }
+
+type TokensResponse struct {
+	AccessToken  string `json:"access_token"`
+	RefreshToken string `json:"refresh_token"`
+}
+
+func TokensResponseFromProto(t *authpb.TokenPair) TokensResponse {
+	return TokensResponse{
+		AccessToken:  t.AccessToken,
+		RefreshToken: t.RefreshToken,
+	}
+}
