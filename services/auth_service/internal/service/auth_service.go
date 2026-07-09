@@ -135,8 +135,18 @@ func (s *authService) Logout(ctx context.Context, input *domain.LogoutInput) err
 	traceID := c.GetTraceID(ctx)
 
 	// Authenticate user
-	_, ok := c.GetUserID(ctx)
+	userID, ok := c.GetUserID(ctx)
 	if !ok {
+		return domain.ErrUserUnauthenticated
+	}
+
+	// Check owner
+	ownerID, err := s.tokenRepo.Get(ctx, input.RefreshToken)
+	if err != nil {
+		return err
+	}
+	if ownerID != userID.String() {
+		log.Declined(s.logger, traceID, "logging out", domain.ErrUserUnauthenticated)
 		return domain.ErrUserUnauthenticated
 	}
 
