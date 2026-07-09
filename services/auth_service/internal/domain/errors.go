@@ -14,4 +14,5 @@ var (
 	ErrInvalidToken         = fmt.Errorf("%w token", errors.ErrUnauthenticated)
 	ErrInvalidClaim         = fmt.Errorf("%w claim", errors.ErrUnauthenticated)
 	ErrInvalidCredentials   = fmt.Errorf("invalid credentials: %w", errors.ErrUnauthenticated)
+	ErrUserUnauthenticated  = fmt.Errorf("user %w", errors.ErrUnauthenticated)
 )

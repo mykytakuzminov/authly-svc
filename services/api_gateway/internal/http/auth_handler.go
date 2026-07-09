@@ -140,3 +140,37 @@ func (h *authHTTPHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 		log.FailedWriteResponse(h.logger, traceID, err)
 	}
 }
+
+func (h *authHTTPHandler) Logout(w http.ResponseWriter, r *http.Request) {
+	traceID := c.GetTraceID(r.Context())
+
+	var reqBody domain.LogoutInput
+	if err := ReadJSON(w, r, &reqBody); err != nil {
+		log.FailedParseJSON(h.logger, traceID, err)
+		responseBadRequest(w, "failed to parse JSON data")
+		return
+	}
+
+	if err := h.validator.Struct(&reqBody); err != nil {
+		log.FailedValidateData(h.logger, traceID, err)
+		responseBadRequest(w, "failed to validate data")
+		return
+	}
+
+	_, err := h.authClient.Logout(r.Context(), reqBody.ToProto())
+	if err != nil {
+		code, msg := errors.ToHTTPError(err)
+		if code >= 500 {
+			log.Failed(h.logger, traceID, "logging out", err)
+		} else {
+			log.Declined(h.logger, traceID, "logging out", err)
+		}
+		http.Error(w, msg, code)
+		return
+	}
+
+	response := contracts.APIResponse{Data: nil}
+	if err := WriteJSON(w, http.StatusOK, response); err != nil {
+		log.FailedWriteResponse(h.logger, traceID, err)
+	}
+}

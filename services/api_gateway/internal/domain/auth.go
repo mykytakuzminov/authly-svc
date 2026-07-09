@@ -35,3 +35,13 @@ func (i *RefreshInput) ToProto() *authpb.RefreshRequest {
 		RefreshToken: i.RefreshToken,
 	}
 }
+
+type LogoutInput struct {
+	RefreshToken string `json:"refresh_token" validate:"required"`
+}
+
+func (i *LogoutInput) ToProto() *authpb.LogoutRequest {
+	return &authpb.LogoutRequest{
+		RefreshToken: i.RefreshToken,
+	}
+}

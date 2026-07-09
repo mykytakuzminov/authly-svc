@@ -22,7 +22,10 @@ func NewAuthServiceClient() (*AuthServiceClient, error) {
 	conn, err := grpc.NewClient(
 		addr,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithUnaryInterceptor(i.TraceClientInterceptor),
+		grpc.WithChainUnaryInterceptor(
+			i.TraceClientInterceptor,
+			i.UserContextClientInterceptor,
+		),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("connect auth service: %w", err)
