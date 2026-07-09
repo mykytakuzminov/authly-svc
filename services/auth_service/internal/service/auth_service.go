@@ -131,6 +131,24 @@ func (s *authService) Refresh(ctx context.Context, input *domain.RefreshInput) (
 	return tokens, nil
 }
 
+func (s *authService) Logout(ctx context.Context, input *domain.LogoutInput) error {
+	traceID := c.GetTraceID(ctx)
+
+	// Authenticate user
+	_, ok := c.GetUserID(ctx)
+	if !ok {
+		return domain.ErrUserUnauthenticated
+	}
+
+	// Delete token from database
+	if err := s.tokenRepo.Delete(ctx, input.RefreshToken); err != nil {
+		return err
+	}
+
+	log.Success(s.logger, traceID, "logging out")
+	return nil
+}
+
 func (s *authService) Validate(ctx context.Context, input *domain.ValidateInput) (*domain.Claims, error) {
 	claims, err := s.jwtManager.Parse(ctx, input.AccessToken)
 	if err != nil {

@@ -102,6 +102,24 @@ func (h *authGrpcHandler) Refresh(ctx context.Context, req *authpb.RefreshReques
 	}, nil
 }
 
+func (h *authGrpcHandler) Logout(ctx context.Context, req *authpb.LogoutRequest) (*authpb.LogoutResponse, error) {
+	traceID := c.GetTraceID(ctx)
+
+	input := &domain.LogoutInput{
+		RefreshToken: req.RefreshToken,
+	}
+	if err := h.validator.Struct(input); err != nil {
+		log.FailedValidateData(h.logger, traceID, err)
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
+	if err := h.authSvc.Logout(ctx, input); err != nil {
+		return nil, errors.ToGRPCError(err)
+	}
+
+	return &authpb.LogoutResponse{}, nil
+}
+
 func (h *authGrpcHandler) Validate(
 	ctx context.Context,
 	req *authpb.ValidateRequest,
