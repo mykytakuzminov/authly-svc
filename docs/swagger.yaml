@@ -1,17 +1,222 @@
 basePath: /api/v1
+definitions:
+  domain.LoginInput:
+    properties:
+      email:
+        maxLength: 255
+        type: string
+      password:
+        maxLength: 72
+        minLength: 12
+        type: string
+    required:
+    - email
+    - password
+    type: object
+  domain.LogoutInput:
+    properties:
+      refresh_token:
+        type: string
+    required:
+    - refresh_token
+    type: object
+  domain.RefreshInput:
+    properties:
+      refresh_token:
+        type: string
+    required:
+    - refresh_token
+    type: object
+  domain.RegisterInput:
+    properties:
+      email:
+        maxLength: 255
+        type: string
+      password:
+        maxLength: 72
+        minLength: 12
+        type: string
+    required:
+    - email
+    - password
+    type: object
+  domain.TokensResponse:
+    properties:
+      access_token:
+        type: string
+      refresh_token:
+        type: string
+    type: object
+  http.APIError:
+    properties:
+      code:
+        type: string
+      message:
+        type: string
+    type: object
+  http.ErrorResponse:
+    properties:
+      error:
+        $ref: '#/definitions/http.APIError'
+    type: object
+  http.SuccessResponse:
+    properties:
+      data: {}
+    type: object
 info:
   contact: {}
   title: Ridely
   version: "1.0"
 paths:
+  /auth/login:
+    post:
+      consumes:
+      - application/json
+      description: Authenticate user with credentials and return tokens
+      parameters:
+      - description: Login credentials
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/domain.LoginInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/http.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/domain.TokensResponse'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/http.ErrorResponse'
+        "401":
+          description: Unauthenticated
+          schema:
+            $ref: '#/definitions/http.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/http.ErrorResponse'
+      summary: Authenticate user
+      tags:
+      - auth
+  /auth/logout:
+    post:
+      consumes:
+      - application/json
+      description: Logout user and delete refresh token
+      parameters:
+      - description: Delete token
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/domain.LogoutInput'
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/http.ErrorResponse'
+        "401":
+          description: Unauthenticated
+          schema:
+            $ref: '#/definitions/http.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/http.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Logout user
+      tags:
+      - auth
+  /auth/refresh:
+    post:
+      consumes:
+      - application/json
+      description: Generate new tokens and return them to client
+      parameters:
+      - description: Refresh token
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/domain.RefreshInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/http.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/domain.TokensResponse'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/http.ErrorResponse'
+        "401":
+          description: Unauthenticated
+          schema:
+            $ref: '#/definitions/http.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/http.ErrorResponse'
+      summary: Refresh tokens
+      tags:
+      - auth
   /auth/register:
     post:
       consumes:
       - application/json
+      description: Register new user with credentials and return tokens
+      parameters:
+      - description: Register credentials
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/domain.RegisterInput'
       produces:
       - application/json
-      responses: {}
-      summary: Register a new user
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/http.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/domain.TokensResponse'
+              type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/http.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/http.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/http.ErrorResponse'
+      summary: Register new user
       tags:
       - auth
 securityDefinitions:

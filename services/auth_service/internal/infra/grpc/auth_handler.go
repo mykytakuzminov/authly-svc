@@ -34,7 +34,7 @@ func NewAuthHandler(
 	}
 }
 
-func (h *authGrpcHandler) Register(ctx context.Context, req *authpb.RegisterRequest) (*authpb.RegisterResponse, error) {
+func (h *authGrpcHandler) Register(ctx context.Context, req *authpb.RegisterRequest) (*authpb.TokenPair, error) {
 	traceID := c.GetTraceID(ctx)
 
 	input := &domain.RegisterInput{
@@ -51,13 +51,13 @@ func (h *authGrpcHandler) Register(ctx context.Context, req *authpb.RegisterRequ
 		return nil, errors.ToGRPCError(err)
 	}
 
-	return &authpb.RegisterResponse{
+	return &authpb.TokenPair{
 		AccessToken:  tokens.AccessToken,
 		RefreshToken: tokens.RefreshToken,
 	}, nil
 }
 
-func (h *authGrpcHandler) Login(ctx context.Context, req *authpb.LoginRequest) (*authpb.LoginResponse, error) {
+func (h *authGrpcHandler) Login(ctx context.Context, req *authpb.LoginRequest) (*authpb.TokenPair, error) {
 	traceID := c.GetTraceID(ctx)
 
 	input := &domain.LoginInput{
@@ -74,13 +74,13 @@ func (h *authGrpcHandler) Login(ctx context.Context, req *authpb.LoginRequest) (
 		return nil, errors.ToGRPCError(err)
 	}
 
-	return &authpb.LoginResponse{
+	return &authpb.TokenPair{
 		AccessToken:  tokens.AccessToken,
 		RefreshToken: tokens.RefreshToken,
 	}, nil
 }
 
-func (h *authGrpcHandler) Refresh(ctx context.Context, req *authpb.RefreshRequest) (*authpb.RefreshResponse, error) {
+func (h *authGrpcHandler) Refresh(ctx context.Context, req *authpb.RefreshRequest) (*authpb.TokenPair, error) {
 	traceID := c.GetTraceID(ctx)
 
 	input := &domain.RefreshInput{
@@ -96,7 +96,7 @@ func (h *authGrpcHandler) Refresh(ctx context.Context, req *authpb.RefreshReques
 		return nil, errors.ToGRPCError(err)
 	}
 
-	return &authpb.RefreshResponse{
+	return &authpb.TokenPair{
 		AccessToken:  tokens.AccessToken,
 		RefreshToken: tokens.RefreshToken,
 	}, nil

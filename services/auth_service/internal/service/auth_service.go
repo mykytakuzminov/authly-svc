@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"go.uber.org/zap"
@@ -45,7 +46,7 @@ func (s *authService) Register(ctx context.Context, input *domain.RegisterInput)
 		return nil, err
 	}
 	if exists {
-		log.Declined(s.logger, traceID, "registration", err)
+		log.Declined(s.logger, traceID, "registration", domain.ErrUserAlreadyExists)
 		return nil, domain.ErrUserAlreadyExists
 	}
 
@@ -79,13 +80,13 @@ func (s *authService) Login(ctx context.Context, input *domain.LoginInput) (*dom
 	// Check email
 	user, err := s.userRepo.GetByEmail(ctx, input.Email)
 	if err != nil {
-		log.Failed(s.logger, traceID, "login", fmt.Errorf("invalid email"))
+		log.Failed(s.logger, traceID, "login", fmt.Errorf("invalid email: %w", err))
 		return nil, domain.ErrInvalidCredentials
 	}
 
 	// Check password
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(input.Password)); err != nil {
-		log.Failed(s.logger, traceID, "login", fmt.Errorf("invalid password"))
+		log.Failed(s.logger, traceID, "login", fmt.Errorf("invalid password: %w", err))
 		return nil, domain.ErrInvalidCredentials
 	}
 
@@ -106,7 +107,11 @@ func (s *authService) Refresh(ctx context.Context, input *domain.RefreshInput) (
 	// Check token existence
 	if _, err := s.tokenRepo.Get(ctx, input.RefreshToken); err != nil {
 		log.Declined(s.logger, traceID, "token refreshing", err)
+		if errors.Is(err, domain.ErrTokenNotFound) {
+			return nil, domain.ErrUserUnauthenticated
+		}
 		return nil, err
+
 	}
 
 	// Get token claims
@@ -143,6 +148,9 @@ func (s *authService) Logout(ctx context.Context, input *domain.LogoutInput) err
 	// Check owner
 	ownerID, err := s.tokenRepo.Get(ctx, input.RefreshToken)
 	if err != nil {
+		if errors.Is(err, domain.ErrTokenNotFound) {
+			return domain.ErrUserUnauthenticated
+		}
 		return err
 	}
 	if ownerID != userID.String() {
